@@ -18,7 +18,7 @@ def draw_status(status):
     print(f"< Lv:{status['Lv']} HP:{status['HP']}/{status['Max_HP']} 空腹度:{status['Hung']}/{status['Max_Hung']}")
     print("-" * 30)
 
-def refresh_screen(dungeon_map, status):
+def refresh_screen(dungeon_map, status, enemies_list):
     # 画面全体を更新する関数
     clear_screen()
     draw_map(dungeon_map)

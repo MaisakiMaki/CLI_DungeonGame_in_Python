@@ -13,9 +13,12 @@ player_status = {
     "Floor": 1
 }
 
-# 暫定的なMAP (5 * 5)
-# #は壁、.は床、@はプレイヤー
+
+# DUNGEON_MAP は空
 DUNGEON_MAP = []
+
+# この階層に出現する敵のリスト
+enemies_list = []
 
 # MAP記号の定義
 MAP_SYMBOLS = {

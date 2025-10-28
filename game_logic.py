@@ -59,7 +59,7 @@ def consume_hunger(status):
         # HP減少ロジックなどを追加
     
 
-def handle_input(dungeon_map, status, move):
+def handle_input(dungeon_map, status, enemies_list, move):
     #入力に応じた処理を呼び出す関数
 
     moved = False
@@ -82,6 +82,7 @@ def handle_input(dungeon_map, status, move):
 FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
+MAX_ENEMIES_PER_ROOM = 2
 
 def create_empty_floor(width, height):
     # 全体が壁のからのフロア(二次元リスト)を作成する関数
@@ -115,10 +116,13 @@ def connect_rooms(dungeon_map, start_point, end_point):
             dungeon_map[y][x2] = MAP_SYMBOLS["FLOOR"]
 
 def generate_dungeon(status):
-    # ダンジョンマップ全体を生成するメイン関数
+    # ダンジョンマップ全体を生成するメイン関数 敵リストも追加
 
     dungeon_map = create_empty_floor(FLOOR_WIDTH, FLOOR_HEIGHT)
     rooms = []
+
+    # 新しい敵リスト
+    new_enemies_list = []
 
     for i in range(MAX_ROOMS):
         room_w = random.randint(5, 12)
@@ -131,6 +135,11 @@ def generate_dungeon(status):
         new_room = create_rooms(dungeon_map, room_x, room_y, room_w, room_h)
         rooms.append(new_room)
 
+        # 最初の部屋以外に敵を配置する
+        if i > 0:
+            place_enemies(dungeon_map, new_room, new_enemies_list)
+
+        # 通路で塞ぐ
         if i > 0:
             prev_center = rooms[0]['center']
             current_center = new_room['center']
@@ -144,4 +153,40 @@ def generate_dungeon(status):
         end_x, end_y = rooms[-1]['center']
         dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
     
-    return dungeon_map
+    return dungeon_map, new_enemies_list
+
+def place_enemies(dungeon_map, room, enemies_list):
+    # 部屋の中にランダムに敵を配置する関数
+
+    # この部屋に何体の敵を置くか決める
+    num_enemies = random.randint(0, MAX_ENEMIES_PER_ROOM)
+
+    for _ in range(num_enemies):
+        # 敵を置ける床(.)を探す
+        # 100回試行して、ランダムな床(.)を見つける
+        for _ in range(100):
+            enemy_x = random.randint(room['x'], room['x'] + room["w"] - 1)
+            enemy_y = random.randint(room['y'], room['y'] + room['h'] - 1)
+
+            # その場所が床(.)なら、敵を配置する
+            if dungeon_map[enemy_y][enemy_x] == MAP_SYMBOLS["FLOOR"]:
+
+                # 1. 敵のステータスを辞書で定義
+                #    (今は仮)
+                new_enemy = {
+                    "HP": 5,
+                    "Atk": 2,
+                    "Def": 1,
+                    "X": enemy_x,
+                    "Y": enemy_y
+                }
+
+                # 2. 敵リストに追加
+                enemies_list.append(new_enemy)
+
+                # 3. マップに 'E' を書き込む
+                dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["ENEMY"]
+
+                # 1体配置したら次の敵へ
+                break
+
