@@ -1,6 +1,6 @@
-from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list
+from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list, game_log
 from display import refresh_screen
-from game_logic import get_movement_input, handle_input, generate_dungeon
+from game_logic import get_movement_input, handle_input, generate_dungeon, add_log
 
 
 def game_loop(enemies_list):
@@ -13,7 +13,7 @@ def game_loop(enemies_list):
     while is_running:
 
         # 画面の更新
-        refresh_screen(DUNGEON_MAP, player_status, enemies_list)
+        refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log)
 
         # プレイヤーの入力を待つ
         action = get_movement_input()
@@ -35,4 +35,6 @@ if __name__ == "__main__":
     DUNGEON_MAP[player_status['Y']][player_status['X']] = MAP_SYMBOLS["PLAYER"]
 
     # 敵やアイテムの初期配置ロジックはここに
+
+    add_log("ようこそ、鳳の間に。")
     game_loop(new_enemies_list)

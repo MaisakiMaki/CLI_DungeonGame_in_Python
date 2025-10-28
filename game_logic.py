@@ -1,5 +1,11 @@
 import random
-from game_data import MAP_SYMBOLS
+from game_data import MAP_SYMBOLS, game_log
+
+def add_log(message):
+    #ゲームログに新しいメッセージを追加する関数
+    game_log.append(message)
+    if len(game_log) > 50:
+        game_log.pop
 
 def get_movement_input():
     #プレイヤーの入力を受け付ける関数
@@ -226,7 +232,7 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
             break
     
     if target_enemy is None:
-        print("エラー：見えない敵を攻撃してるね？旅人さん？")
+        add_log("エラー：見えない敵を攻撃してるね？旅人さん？")
         return
     
     # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
@@ -235,13 +241,13 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
 
     if damage > 0:
         target_enemy["HP"] -= damage
-        print(f"敵に{damage}のダメージを与えた! (敵残りHP: {target_enemy['HP']})")
+        add_log(f"敵に{damage}のダメージを与えた! (敵残りHP: {target_enemy['HP']})")
     else:
-        print("敵は攻撃を弾いた！")
+        add_log("敵は攻撃を弾いた！")
     
     # 3. 敵のHPが0以下になったかチェック
     if target_enemy["HP"] <= 0:
-        print("敵を倒した!")
+        add_log("敵を倒した!")
         # マップから 'E' を消して床 '.' にする
         dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["FLOOR"]
         # 敵のリストから削除する
@@ -250,10 +256,12 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
 def enemy_turn(dungeon_map, player_status, enemies_list):
     #すべての敵の行動処理を行う関数
 
-    print("--- 敵のターン ---")
+    add_log("--- 敵のターン ---")
     if not enemies_list:
-        print("敵は誰もいなかった")
+        add_log("敵は誰もいなかった")
         return
+    
+    player_x, player_y = player_status["X"], player_status["Y"]
     
     #敵が複数いてもいいようにリストをコピーして処理する
     for enemy in enemies_list[:]:
@@ -262,11 +270,75 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
         if enemy not in enemies_list:
             continue
 
-        # TODO: 索敵と移動アルゴリズム
+        enemy_x, enemy_y = enemy["X"], enemy["Y"]
 
-        #今は蠢くだけ
-        print(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
+        # --- 索敵と移動アルゴリズム ---
 
-        # TODO: 敵の攻撃アルゴリズム
+        move_x = 1 if player_x > enemy_x else -1 if player_x < enemy_x else 0
+        move_y = 1 if player_y > enemy_y else -1 if player_y < enemy_y else 0
+
+        if abs(player_x - enemy_x) >= abs(player_y - enemy_y):
+            #Xを優先
+
+            # Xを試す
+            new_x, new_y = enemy_x + move_x, enemy_y + move_y
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+                continue
+            
+            new_x, new_y = enemy_x, enemy_y + move_y
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+                continue # 行動成功
+        else:
+            # Y方向を優先
+            
+            # 2-1. Y方向を試す
+            new_x, new_y = enemy_x, enemy_y + move_y
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+                continue # 行動成功
+
+            # 2-2. YがダメならX方向を試す
+            new_x, new_y = enemy_x + move_x, enemy_y
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+                continue # 行動成功
+
+        add_log(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
+
+
+        
+
+def enemy_attack_player(enemy, player_status):
+    #敵がプレイヤーを攻撃する関数
+
+    #ダメージ計算はアルテリオス
+    damage = max(0, enemy["Atk"] - player_status["Def"])
+
+    if damage > 0:
+        player_status["HP"] -= damage
+        add_log(f"敵から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
+    else:
+        add_log("敵の攻撃をかわした!")
+
+def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+
+    # 0. 移動先が何もないなら失敗
+    if new_x == enemy["X"] and new_y == enemy["Y"]:
+        return False
+    
+    # 1. 移動先はプレイヤー？
+    if dungeon_map[new_y][new_x] == MAP_SYMBOLS["PLAYER"]:
+        enemy_attack_player(enemy, player_status)
+        return True
+    
+    # 2. 移動先は有効な床か？
+    if is_valid_move(dungeon_map, new_x, new_y) and \
+       dungeon_map[new_y][new_x] != MAP_SYMBOLS["ENEMY"]:
+        
+        #移動を実行
+        dungeon_map[enemy["Y"]][enemy["X"]] = MAP_SYMBOLS["FLOOR"]
+        enemy["X"], enemy["Y"] = new_x, new_y
+        dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
+        return True
+    
+    return False
 
 

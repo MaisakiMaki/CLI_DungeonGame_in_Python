@@ -20,6 +20,8 @@ DUNGEON_MAP = []
 # この階層に出現する敵のリスト
 enemies_list = []
 
+game_log = []
+
 # MAP記号の定義
 MAP_SYMBOLS = {
     "WALL": '#',
