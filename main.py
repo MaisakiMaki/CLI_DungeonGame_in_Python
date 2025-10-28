@@ -2,10 +2,11 @@ from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list
 from display import refresh_screen
 from game_logic import get_movement_input, handle_input, generate_dungeon
 
-def game_loop():
+
+def game_loop(enemies_list):
     # ゲームのメインループ
 
-    global DUNGEON_MAP, player_status, enemies_list
+    global DUNGEON_MAP, player_status
 
     is_running = True
     
@@ -30,8 +31,8 @@ if __name__ == "__main__":
     print("ローグライクゲーム起動")
 
     # 初期位置をマップに反映(最初のセットアップ)
-    DUNGEON_MAP, enemy_list = generate_dungeon(player_status)
+    DUNGEON_MAP, new_enemies_list = generate_dungeon(player_status)
     DUNGEON_MAP[player_status['Y']][player_status['X']] = MAP_SYMBOLS["PLAYER"]
 
     # 敵やアイテムの初期配置ロジックはここに
-    game_loop()
+    game_loop(new_enemies_list)

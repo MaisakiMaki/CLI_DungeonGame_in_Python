@@ -21,7 +21,7 @@ def is_valid_move(dungeon_map, target_x, target_y):
     # あとでアイテムなどの追加
     return True
     
-def handle_player_move(dungeon_map, status, dx, dy):
+def handle_player_move(dungeon_map, status, enemies_list, dx, dy):
     #プレイヤーの移動とマップの更新を行う関数
 
     # 現在地の座標
@@ -30,22 +30,43 @@ def handle_player_move(dungeon_map, status, dx, dy):
     #移動先の座標
     new_x, new_y = current_x + dx , current_y + dy
 
-    if is_valid_move(dungeon_map, new_x, new_y):
+    # 壁かどうかだけチェック
+    if not is_valid_move(dungeon_map, new_x, new_y):
+        return False
+    
+    # 移動先の中身をチェック
+    target_tile = dungeon_map[new_y][new_x]
 
-        # 1. 元の場所を床に戻す
-        dungeon_map[current_y][current_x] = MAP_SYMBOLS["FLOOR"]
-
-        # 2. プレイヤーの位置を更新
-        status['X'], status['Y'] = new_x, new_y
-
-        # 3. 新しい場所にプレイヤーシンボルを置く
-        dungeon_map[new_y][new_x] = MAP_SYMBOLS["PLAYER"]
-
-        # 4. 空腹度の消費
+    if target_tile == MAP_SYMBOLS["ENEMY"]:
+        # 移動先が敵のため、攻撃
+        print("敵に攻撃!")
+        combat(dungeon_map, status, enemies_list, new_x, new_y)
         consume_hunger(status)
+        return True
+    
+    elif target_tile == MAP_SYMBOLS["STAIRS"]:
+        # 移動先が階段のため、降りる
+        print("階段を降りた!")
+        # TODO: 次の階層へ進むロジック(あとで実装)
+        # consume_hunger(status)
+        # return True
+        return False
+    
 
-        return True #移動成功
-    return False # 移動失敗
+    # 何もなければ↓
+    # 1. 元の場所を床に戻す
+    dungeon_map[current_y][current_x] = MAP_SYMBOLS["FLOOR"]
+
+    # 2. プレイヤーの位置を更新
+    status['X'], status['Y'] = new_x, new_y
+
+    # 3. 新しい場所にプレイヤーシンボルを置く
+    dungeon_map[new_y][new_x] = MAP_SYMBOLS["PLAYER"]
+
+    # 4. 空腹度の消費
+    consume_hunger(status)
+
+    return True #移動成功
 
 def consume_hunger(status):
     # 空腹度を計算する関数
@@ -66,17 +87,20 @@ def handle_input(dungeon_map, status, enemies_list, move):
 
     # WASDの移動処理
     if move == "w": # 上移動(Yが減る)
-        moved = handle_player_move(dungeon_map, status, 0, -1)
+        moved = handle_player_move(dungeon_map, status, enemies_list, 0, -1)
     elif move == "s": # 下移動(Yが増える)
-        moved = handle_player_move(dungeon_map, status, 0, 1)
+        moved = handle_player_move(dungeon_map, status, enemies_list, 0, 1)
     elif move == "a": # 左移動(Xが減る)
-        moved = handle_player_move(dungeon_map, status, -1, 0)
+        moved = handle_player_move(dungeon_map, status, enemies_list, -1, 0)
     elif move == "d": # 右移動(Xが増える)
-        moved = handle_player_move(dungeon_map, status, 1, 0)
+        moved = handle_player_move(dungeon_map, status, enemies_list, 1, 0)
     elif move == "c": # メニュー表示
         #あとで実装
         print("メニューが開かれました")
     
+    if moved:
+        enemy_turn(dungeon_map, status, enemies_list)
+
     return move != 'q'
 
 FLOOR_WIDTH = 40
@@ -89,7 +113,7 @@ def create_empty_floor(width, height):
 
     return [[MAP_SYMBOLS["WALL"] for _ in range(width)] for _ in range(height)]
 
-def create_rooms(dungeon_map, x, y, w, h):
+def create_room(dungeon_map, x, y, w, h):
     # 指定された座標に部屋を生成する関数
     for i in range(y, y + h):
         for j in range(x, x + w):
@@ -132,7 +156,7 @@ def generate_dungeon(status):
 
         # TODO: 部屋の重なりチェックはあとで実装。
 
-        new_room = create_rooms(dungeon_map, room_x, room_y, room_w, room_h)
+        new_room = create_room(dungeon_map, room_x, room_y, room_w, room_h)
         rooms.append(new_room)
 
         # 最初の部屋以外に敵を配置する
@@ -141,7 +165,7 @@ def generate_dungeon(status):
 
         # 通路で塞ぐ
         if i > 0:
-            prev_center = rooms[0]['center']
+            prev_center = rooms[i - 1]['center']
             current_center = new_room['center']
             connect_rooms(dungeon_map, prev_center, current_center)
     
@@ -189,4 +213,60 @@ def place_enemies(dungeon_map, room, enemies_list):
 
                 # 1体配置したら次の敵へ
                 break
+
+def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
+    # プレイヤーの攻撃処理を行う関数
+
+    target_enemy = None
+    
+    # 座標から、攻撃対象の敵オブジェクトを探す
+    for enemy in enemies_list:
+        if enemy["X"] == enemy_x and enemy["Y"] == enemy_y:
+            target_enemy = enemy
+            break
+    
+    if target_enemy is None:
+        print("エラー：見えない敵を攻撃してるね？旅人さん？")
+        return
+    
+    # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
+    # (game_data.py の Atk, Def を使うぞ)
+    damage = max(0, player_status["Atk"] - target_enemy["Def"])
+
+    if damage > 0:
+        target_enemy["HP"] -= damage
+        print(f"敵に{damage}のダメージを与えた! (敵残りHP: {target_enemy['HP']})")
+    else:
+        print("敵は攻撃を弾いた！")
+    
+    # 3. 敵のHPが0以下になったかチェック
+    if target_enemy["HP"] <= 0:
+        print("敵を倒した!")
+        # マップから 'E' を消して床 '.' にする
+        dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["FLOOR"]
+        # 敵のリストから削除する
+        enemies_list.remove(target_enemy)
+
+def enemy_turn(dungeon_map, player_status, enemies_list):
+    #すべての敵の行動処理を行う関数
+
+    print("--- 敵のターン ---")
+    if not enemies_list:
+        print("敵は誰もいなかった")
+        return
+    
+    #敵が複数いてもいいようにリストをコピーして処理する
+    for enemy in enemies_list[:]:
+
+        #敵がリストがら削除されているか確認
+        if enemy not in enemies_list:
+            continue
+
+        # TODO: 索敵と移動アルゴリズム
+
+        #今は蠢くだけ
+        print(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
+
+        # TODO: 敵の攻撃アルゴリズム
+
 
