@@ -250,15 +250,35 @@ def place_items(dungeon_map, room, items_list):
             # その場所が床(.)ならアイテムを配置
             if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
 
-                #アイテムのデータを辞書で管理
-                #仮で薬草を置く
-                
-                new_item = {
-                    "name": "薬草",
-                    "type": "potion",
-                    "effect": 10 # 10回復
-                }
+                item_roll = random.randint(1, 100)
+                new_item = None
 
+                if item_roll <= 40:
+                    new_item = {
+                        "name": "薬草",
+                        "type": "potion",
+                        "effect": 10 # 10回復
+                    }
+                elif item_roll <= 70:
+                    new_item = {
+                        "name": "おにぎり",
+                        "type": "food",
+                        "effect": 50 # 10回復
+                    }
+                elif item_roll <= 85:
+                    new_item = {
+                        "name": "こんぼう",
+                        "type": "weapon",
+                        "atk_bonus": 2,
+                        "def_bonus": 0
+                    }
+                else:
+                    new_item = {
+                        "name": "木の盾",
+                        "type": "shield",
+                        "atk_bonus": 0,
+                        "def_bonus": 2 # 防御力 +2
+                    }
                 dungeon_map[item_y][item_x] = MAP_SYMBOLS["ITEM"]
 
                 #アイテムリストに追加
@@ -436,11 +456,14 @@ def handle_menu_input(status, items_list, action):
     elif action.isdigit():
         #数字が入力されたら、アイテム使用を試みる
         item_index = int(action)
-        use_item(status, item_index)
+        item_used = use_item(status, item_index)
 
-        #アイテムを使ったら自動でメニューを閉じてターンが進む
-        game_data.game_state = "playing"
-        # TODO: 敵のターンをここで呼び出す
+        if item_used:
+            #アイテムを使ったら自動でメニューを閉じてターンが進む
+            game_data.game_state = "playing"
+            # TODO: 敵のターンをここで呼び出す
+            enemy_turn(game_data.DUNGEON_MAP, status, game_data.enemies_list)
+
     
     elif action == "q":
         return False
@@ -458,8 +481,13 @@ def use_item(player_status, item_index):
         return
     
     item_to_use = inventory[item_index]
+    item_type = item_to_use.get("type", "unknown")
 
-    if item_to_use["type"] == "potion":
+    if item_type == "potion":
+
+        if player_status["HP"] >= player_status["Max_HP"]:
+            add_log("もうHPは満タンだ。")
+            return False
 
         # HP回復
         heal_amount = item_to_use["effect"]
@@ -472,9 +500,29 @@ def use_item(player_status, item_index):
         add_log(f"{item_to_use['name']} を使った! HPが {heal_amount} 回復した!")
 
         inventory.pop(item_index)
+        return True
+
+    elif item_type == "food":
+
+        recover_amount = item_to_use["effect"]
+
+        if player_status["Hung"] >= player_status["Max_Hung"]:
+            add_log("お腹は空いてない。")
+            return False
+        
+        player_status["Hung"] = min(player_status["Max_Hung"], player_status["Hung"] + recover_amount)
+        add_log(f"{item_to_use['name']} を食べた! 空腹度が {recover_amount} 回復した!")
+
+        inventory.pop(item_index)
+        return True
+    
+    elif item_type in ["weapon", "shield"]:
+        add_log(f"{item_to_use['name']} は装備するものだ。")
+        return False
 
     else:
         add_log(f"{item_to_use['name']} は今使えない。")
+        return False
 
 def gain_experience(player_status, exp_amount):
     
