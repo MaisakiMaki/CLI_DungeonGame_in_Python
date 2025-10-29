@@ -1,4 +1,5 @@
 import random
+import game_data
 from game_data import MAP_SYMBOLS, game_log
 
 def add_log(message):
@@ -105,8 +106,10 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
     elif move == "d": # 右移動(Xが増える)
         moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
     elif move == "c": # メニュー表示
-        #あとで実装
-        print("メニューが開かれました")
+        # 'c'が押されたらステートをcにする
+        add_log("メニューを開いた")
+        game_data.game_state = "menu"
+        moved = False
     
     if moved:
         enemy_turn(dungeon_map, status, enemies_list)
@@ -247,7 +250,7 @@ def place_items(dungeon_map, room, items_list):
                 
                 new_item = {
                     "name": "薬草",
-                    "type": "portion",
+                    "type": "potion",
                     "effect": 10 # 10回復
                 }
 
@@ -406,4 +409,59 @@ def pickup_item(player_status, items_list, item_x, item_y):
     else:
         add_log("エラー：見えないアイテムを拾ったみたいだね、旅人さん")
 
+def get_menu_input():
+    #メニューようの入力を受け付ける
+    move = input("使用するアイテムの番号(0, 1...) または 終了(x) を入力").lower()
+    return move
 
+def handle_menu_input(status, items_list, action):
+    #メニュー入力に応じた処理を呼び出す関数
+    global game_state
+    
+    if action == "x":
+        # xならメニューを閉じる
+        game_data.game_state = "playing"
+        add_log("メニューを閉じた")
+    
+    elif action.isdigit():
+        #数字が入力されたら、アイテム使用を試みる
+        item_index = int(action)
+        use_item(status, item_index)
+
+        #アイテムを使ったら自動でメニューを閉じてターンが進む
+        game_data.game_state = "playing"
+        # TODO: 敵のターンをここで呼び出す
+    
+    elif action == "q":
+        return False
+    
+    return True
+
+def use_item(player_status, item_index):
+    #指定されたインデックスのアイテムを使用する関数
+
+    inventory = player_status["inventory"]
+
+    # 有効なインデックスかチェック
+    if not (0 <= item_index < len(inventory)):
+        add_log("無は使えないよ")
+        return
+    
+    item_to_use = inventory[item_index]
+
+    if item_to_use["type"] == "potion":
+
+        # HP回復
+        heal_amount = item_to_use["effect"]
+        player_status["HP"] += heal_amount
+
+        # Max_HPを超えないようにする
+        if player_status["HP"] > player_status["Max_HP"]:
+            player_status["HP"] = player_status["Max_HP"]
+        
+        add_log(f"{item_to_use['name']} を使った! HPが {heal_amount} 回復した!")
+
+        inventory.pop(item_index)
+
+    else:
+        add_log(f"{item_to_use['name']} は今使えない。")

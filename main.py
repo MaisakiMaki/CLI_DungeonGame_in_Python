@@ -1,45 +1,50 @@
+import game_data
 from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list, game_log
 from display import refresh_screen, clear_screen
-from game_logic import get_movement_input, handle_input, generate_dungeon, add_log
+from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input
 
 
 def game_loop(enemies_list, items_list):
-    # ゲームのメインループ
-
     global DUNGEON_MAP, player_status
-    is_running = True
     
-    # clear_screen() と refresh_screen() はループの外からは消す！
+    is_running = True
 
     while is_running:
-
-        # 1. 【重要】まず画面をクリア
+        
+        # 1. まず画面をクリア
         clear_screen()
         
-        # 2. 最新の状態を描画（前回のログもここで表示される）
-        refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log)
+        # 2. 最新の状態を描画
+        # 【修正】 game_state -> game_data.game_state
+        refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log, game_data.game_state)
 
-        # 3. プレイヤーの入力を待つ
-        action = get_movement_input()
+        # 3. ゲームの状態によって処理を分岐
+        
+        # 【修正】 game_state -> game_data.game_state
+        if game_data.game_state == "playing":
+            action = get_movement_input()
+            is_running = handle_input(DUNGEON_MAP, player_status, enemies_list, items_list, action)
+        
+        # 【修正】 game_state -> game_data.game_state
+        elif game_data.game_state == "menu":
+            action = get_menu_input()
+            is_running = handle_menu_input(player_status, items_list, action)
 
-        # 4. 入力に応じた処理 (ここで game_log が更新される)
-        is_running = handle_input(DUNGEON_MAP, player_status, enemies_list, items_list, action)
-
-        # 5. HPが0になったら終了
+        # 4. HPが0になったら終了
         if player_status['HP'] <= 0:
             add_log("GAME OVER...")
-            is_running = False # 次のループで終了
+            is_running = False 
             
-        # 6. ループ終了の判定 (HPゼロまたは'q'入力)
+        # 5. ループ終了の判定
         if not is_running:
-            # 最後のログをもう一度表示
             clear_screen()
-            refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log)
+            # 【修正】 game_state -> game_data.game_state
+            refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log, game_data.game_state)
             if player_status['HP'] <= 0:
                 print("GAME OVER...")
             else:
                 print("ゲームを終了しました。")
-            break # ループを抜ける
+            break
         
 
 # メインプログラムの開始

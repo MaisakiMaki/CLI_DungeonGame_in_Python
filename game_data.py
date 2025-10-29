@@ -1,6 +1,9 @@
+#ゲームの現在の状態
+game_state = "playing"
+
 player_status = {
     "Lv": 1,
-    "HP": 20,
+    "HP": 10,
     "Max_HP": 20,
     "Atk": 5,
     "Def": 3,

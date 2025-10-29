@@ -27,10 +27,27 @@ def draw_log(log_list):
     for message in display_logs:
         print(f"> {message}")
 
-def refresh_screen(dungeon_map, status, enemies_list, game_log):
+def draw_menu(inventory):
+    #メニュー画面を描画する関数
+    print("-" * 30)
+    print("【持ち物】")
+
+    if not inventory:
+        print("何も持っていない。")
+    else:
+        #番号付きでアイテム一覧を表示
+        for i, item in enumerate(inventory):
+            print(f"{i}: {item['name']}")
+    print("-" * 30)
+
+def refresh_screen(dungeon_map, status, enemies_list, game_log, game_state):
     # 画面全体を更新する関数
     #clear_screen()
     draw_map(dungeon_map)
     draw_status(status)
     draw_log(game_log)
+
+    if game_state == "menu":
+        draw_menu(status["inventory"])
+
 
