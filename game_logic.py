@@ -27,7 +27,7 @@ def is_valid_move(dungeon_map, target_x, target_y):
     # あとでアイテムなどの追加
     return True
     
-def handle_player_move(dungeon_map, status, enemies_list, dx, dy):
+def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
     #プレイヤーの移動とマップの更新を行う関数
 
     # 現在地の座標
@@ -58,8 +58,12 @@ def handle_player_move(dungeon_map, status, enemies_list, dx, dy):
         # return True
         return False
     
+    elif target_tile == MAP_SYMBOLS["ITEM"]:
 
-    # 何もなければ↓
+        pickup_item(status, items_list, new_x, new_y)
+    
+
+    add_log("移動した。")
     # 1. 元の場所を床に戻す
     dungeon_map[current_y][current_x] = MAP_SYMBOLS["FLOOR"]
 
@@ -86,20 +90,20 @@ def consume_hunger(status):
         # HP減少ロジックなどを追加
     
 
-def handle_input(dungeon_map, status, enemies_list, move):
+def handle_input(dungeon_map, status, enemies_list, items_list, move):
     #入力に応じた処理を呼び出す関数
 
     moved = False
 
     # WASDの移動処理
     if move == "w": # 上移動(Yが減る)
-        moved = handle_player_move(dungeon_map, status, enemies_list, 0, -1)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, -1)
     elif move == "s": # 下移動(Yが増える)
-        moved = handle_player_move(dungeon_map, status, enemies_list, 0, 1)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, 1)
     elif move == "a": # 左移動(Xが減る)
-        moved = handle_player_move(dungeon_map, status, enemies_list, -1, 0)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, -1, 0)
     elif move == "d": # 右移動(Xが増える)
-        moved = handle_player_move(dungeon_map, status, enemies_list, 1, 0)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
     elif move == "c": # メニュー表示
         #あとで実装
         print("メニューが開かれました")
@@ -113,6 +117,7 @@ FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
 MAX_ENEMIES_PER_ROOM = 2
+MAX_ITEM_PER_ROOM = 2
 
 def create_empty_floor(width, height):
     # 全体が壁のからのフロア(二次元リスト)を作成する関数
@@ -154,6 +159,9 @@ def generate_dungeon(status):
     # 新しい敵リスト
     new_enemies_list = []
 
+    #この階層のアイテムリスト
+    new_item_list = []
+
     for i in range(MAX_ROOMS):
         room_w = random.randint(5, 12)
         room_h = random.randint(4, 9)
@@ -168,6 +176,7 @@ def generate_dungeon(status):
         # 最初の部屋以外に敵を配置する
         if i > 0:
             place_enemies(dungeon_map, new_room, new_enemies_list)
+            place_items(dungeon_map, new_room, new_item_list)
 
         # 通路で塞ぐ
         if i > 0:
@@ -183,7 +192,7 @@ def generate_dungeon(status):
         end_x, end_y = rooms[-1]['center']
         dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
     
-    return dungeon_map, new_enemies_list
+    return dungeon_map, new_enemies_list, new_item_list
 
 def place_enemies(dungeon_map, room, enemies_list):
     # 部屋の中にランダムに敵を配置する関数
@@ -218,6 +227,37 @@ def place_enemies(dungeon_map, room, enemies_list):
                 dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["ENEMY"]
 
                 # 1体配置したら次の敵へ
+                break
+
+def place_items(dungeon_map, room, items_list):
+    # 部屋の中にランダムにアイテムを配置する関数
+
+    num_items = random.randint(0, MAX_ITEM_PER_ROOM)
+
+    for _ in range(num_items):
+        for _ in range(100):
+            item_x = random.randint(room['x'], room['x'] + room['w'] - 1)
+            item_y = random.randint(room['y'], room['y'] + room['h'] - 1)
+
+            # その場所が床(.)ならアイテムを配置
+            if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
+
+                #アイテムのデータを辞書で管理
+                #仮で薬草を置く
+                
+                new_item = {
+                    "name": "薬草",
+                    "type": "portion",
+                    "effect": 10 # 10回復
+                }
+
+                dungeon_map[item_y][item_x] = MAP_SYMBOLS["ITEM"]
+
+                #アイテムリストに追加
+                #x,y座標とアイテム辞書をダブルで保存
+
+                items_list.append(((item_x, item_y), new_item))
+
                 break
 
 def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
@@ -256,9 +296,9 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
 def enemy_turn(dungeon_map, player_status, enemies_list):
     #すべての敵の行動処理を行う関数
 
-    add_log("--- 敵のターン ---")
+    #add_log("--- 敵のターン ---")
     if not enemies_list:
-        add_log("敵は誰もいなかった")
+        #add_log("敵は誰もいなかった")
         return
     
     player_x, player_y = player_status["X"], player_status["Y"]
@@ -301,7 +341,7 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
             if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
                 continue # 行動成功
 
-        add_log(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
+        #add_log(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
 
 
         
@@ -340,5 +380,30 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
         return True
     
     return False
+
+def pickup_item(player_status, items_list, item_x, item_y):
+
+    target_item_data = None
+    item_to_remove = None
+
+    # 座標から、アイテムデータをitem_listから探す
+    for item in items_list:
+        coords, data = item
+        if coords == (item_x, item_y):
+            target_item_data = data
+            item_to_remove = item
+            break
+    
+    if target_item_data:
+        #プレイヤーのインベントリに追加
+        player_status["inventory"].append(target_item_data)
+
+        # items_list から削除
+        items_list.remove(item_to_remove)
+
+        # ログに追加
+        add_log(f"{target_item_data['name']} を拾った!")
+    else:
+        add_log("エラー：見えないアイテムを拾ったみたいだね、旅人さん")
 
 

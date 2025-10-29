@@ -23,13 +23,13 @@ def draw_log(log_list):
     print("-" * 30)
     print("【ログ】")
     # ログリストの下から最大5件を表示する
-    display_logs = log_list[-5:]
+    display_logs = log_list[-10:]
     for message in display_logs:
         print(f"> {message}")
 
 def refresh_screen(dungeon_map, status, enemies_list, game_log):
     # 画面全体を更新する関数
-    clear_screen()
+    #clear_screen()
     draw_map(dungeon_map)
     draw_status(status)
     draw_log(game_log)

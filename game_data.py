@@ -10,7 +10,8 @@ player_status = {
     "X": 2,
     # 現在の座標のY座標
     "Y": 2,
-    "Floor": 1
+    "Floor": 1,
+    "inventory": []
 }
 
 
@@ -28,5 +29,6 @@ MAP_SYMBOLS = {
     "FLOOR": '.',
     "PLAYER": '@',
     "ENEMY": 'E',
-    "STAIRS": '<'
+    "STAIRS": '<',
+    "ITEM": '!'
 }
