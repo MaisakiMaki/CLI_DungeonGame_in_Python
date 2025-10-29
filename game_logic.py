@@ -1,6 +1,6 @@
 import random
 import game_data
-from game_data import MAP_SYMBOLS, game_log
+from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE
 
 def add_log(message):
     #ゲームログに新しいメッセージを追加する関数
@@ -142,16 +142,18 @@ def create_room(dungeon_map, x, y, w, h):
 def connect_rooms(dungeon_map, start_point, end_point):
     # 2点をL字型の通路で繋ぐ関数
     x1, y1 = start_point
-    x2, y2 = start_point
+    x2, y2 = end_point  # <--- 修正①：終点(end_point) を使う
 
-    # 1. X方向の通路を掘る
+    # 1. X方向の通路を掘る (y1 の高さで)
     for x in range(min(x1, x2), max(x1, x2) + 1):
-        if 0 < x < FLOOR_WIDTH - 1 and 0 < y1 < FLOOR_HEIGHT - 1:
+        # マップの端(0と最後)は壁のまま残したいので、 1 から (WIDTH-2) の範囲を掘る
+        if 1 <= x < FLOOR_WIDTH - 1 and 1 <= y1 < FLOOR_HEIGHT - 1:
             dungeon_map[y1][x] = MAP_SYMBOLS["FLOOR"]
     
-    # 2. Y方向の通路を掘る
+    # 2. Y方向の通路を掘る (x2 の位置で)
     for y in range(min(y1, y2), max(y1, y2) + 1):
-        if 0 < x2 < FLOOR_WIDTH - 1 and 0 < y1 < FLOOR_HEIGHT - 1:
+         # マップの端(0と最後)は壁のまま残したいので、 1 から (HEIGHT-2) の範囲を掘る
+        if 1 <= x2 < FLOOR_WIDTH - 1 and 1 <= y < FLOOR_HEIGHT - 1: # <--- 修正②： y を使う
             dungeon_map[y][x2] = MAP_SYMBOLS["FLOOR"]
 
 def generate_dungeon(status):
@@ -220,6 +222,7 @@ def place_enemies(dungeon_map, room, enemies_list):
                     "HP": 5,
                     "Atk": 2,
                     "Def": 1,
+                    "Exp": 5,
                     "X": enemy_x,
                     "Y": enemy_y,
                     "standing_on": MAP_SYMBOLS["FLOOR"]
@@ -283,16 +286,19 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
     # (game_data.py の Atk, Def を使うぞ)
     damage = max(0, player_status["Atk"] - target_enemy["Def"])
+    enemy_pos = (target_enemy["X"], target_enemy["Y"])
 
     if damage > 0:
         target_enemy["HP"] -= damage
-        add_log(f"敵に{damage}のダメージを与えた! (敵残りHP: {target_enemy['HP']})")
+        add_log(f"敵{enemy_pos}に{damage}のダメージを与えた! (敵{enemy_pos}残りHP: {target_enemy['HP']})")
     else:
         add_log("敵は攻撃を弾いた！")
     
     # 3. 敵のHPが0以下になったかチェック
     if target_enemy["HP"] <= 0:
         add_log("敵を倒した!")
+        enemy_exp = target_enemy.get("Exp", 1)
+        gain_experience(player_status, enemy_exp)
         # マップから 'E' を消して床 '.' にする
         dungeon_map[enemy_y][enemy_x] = target_enemy["standing_on"]
         # 敵のリストから削除する
@@ -326,7 +332,7 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
             #Xを優先
 
             # Xを試す
-            new_x, new_y = enemy_x + move_x, enemy_y + move_y
+            new_x, new_y = enemy_x + move_x, enemy_y
             if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
                 continue
             
@@ -356,12 +362,13 @@ def enemy_attack_player(enemy, player_status):
 
     #ダメージ計算はアルテリオス
     damage = max(0, enemy["Atk"] - player_status["Def"])
+    enemy_pos = (enemy['X'], enemy['Y'])
 
     if damage > 0:
         player_status["HP"] -= damage
-        add_log(f"敵から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
+        add_log(f"敵{enemy_pos}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
     else:
-        add_log("敵の攻撃をかわした!")
+        add_log(f"敵{enemy_pos}の攻撃をかわした!")
 
 def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
 
@@ -468,3 +475,35 @@ def use_item(player_status, item_index):
 
     else:
         add_log(f"{item_to_use['name']} は今使えない。")
+
+def gain_experience(player_status, exp_amount):
+    
+    player_status["Exp"] += exp_amount
+    add_log(f"{exp_amount} の経験値を獲得した。(現在: {player_status['Exp']}/{player_status['Next_Exp']})")
+    while player_status["Exp"] >= player_status["Next_Exp"]:
+        level_up(player_status)
+
+def level_up(player_status):
+
+    next_level = player_status["Lv"] + 1
+    level_data = LEVEL_UP_TABLE.get(next_level)
+
+    if not level_data:
+        player_status["Next_HP"] = 100000000
+        add_log("君は最大レベルまで達したようだ。")
+        player_status["Exp"] = player_status["Next_Exp"] - 1
+        return
+    
+    player_status["Lv"] += 1
+    player_status["Max_HP"] += level_data["Max_HP_Up"]
+    player_status["Atk"] += level_data["Atk_Up"]
+    player_status["Def"] += level_data["Def_Up"]
+
+    player_status["HP"] = player_status["Max_HP"]
+    player_status["Hung"] = player_status["Max_Hung"]
+
+    player_status["Exp"] -= player_status["Next_Exp"]
+    player_status["Next_Exp"] = level_data["Next_Exp"]
+
+    add_log(f"レベルが {player_status['Lv']} に上がった!")
+    add_log(f"最大HPが {level_data['Max_HP_Up']}、攻撃力が {level_data['Atk_Up']}、防御力が {level_data['Def_Up']} 上がった!")

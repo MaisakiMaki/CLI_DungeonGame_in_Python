@@ -9,6 +9,8 @@ player_status = {
     "Def": 3,
     "Hung": 100,
     "Max_Hung": 100,
+    "Exp": 0,
+    "Next_Exp": 10,
     # 現在の座標のX座標
     "X": 2,
     # 現在の座標のY座標
@@ -34,4 +36,10 @@ MAP_SYMBOLS = {
     "ENEMY": 'E',
     "STAIRS": '<',
     "ITEM": '!'
+}
+
+LEVEL_UP_TABLE ={
+    2: {"Max_HP_Up": 5, "Atk_Up": 2, "Def_Up": 1, "Next_Exp": 25},
+    3: {"Max_HP_Up": 5, "Atk_Up": 2, "Def_Up": 2, "Next_Exp": 50},
+    4: {"Max_HP_Up": 6, "Atk_Up": 3, "Def_Up": 1, "Next_Exp": 100},
 }
