@@ -53,11 +53,12 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
     
     elif target_tile == MAP_SYMBOLS["STAIRS"]:
         # 移動先が階段のため、降りる
-        print("階段を降りた!")
-        # TODO: 次の階層へ進むロジック(あとで実装)
-        # consume_hunger(status)
-        # return True
-        return False
+        add_log("階段を見つけた! 次の階層へ進む...")
+        # 階層レベルを上げる
+        status["Floor"] += 1
+
+        game_data.game_state = "next_floor"
+        return True
     
     elif target_tile == MAP_SYMBOLS["ITEM"]:
 
@@ -220,7 +221,8 @@ def place_enemies(dungeon_map, room, enemies_list):
                     "Atk": 2,
                     "Def": 1,
                     "X": enemy_x,
-                    "Y": enemy_y
+                    "Y": enemy_y,
+                    "standing_on": MAP_SYMBOLS["FLOOR"]
                 }
 
                 # 2. 敵リストに追加
@@ -292,7 +294,7 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     if target_enemy["HP"] <= 0:
         add_log("敵を倒した!")
         # マップから 'E' を消して床 '.' にする
-        dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["FLOOR"]
+        dungeon_map[enemy_y][enemy_x] = target_enemy["standing_on"]
         # 敵のリストから削除する
         enemies_list.remove(target_enemy)
 
@@ -377,7 +379,8 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
        dungeon_map[new_y][new_x] != MAP_SYMBOLS["ENEMY"]:
         
         #移動を実行
-        dungeon_map[enemy["Y"]][enemy["X"]] = MAP_SYMBOLS["FLOOR"]
+        dungeon_map[enemy["Y"]][enemy["X"]] = enemy["standing_on"]
+        enemy["standing_on"] = dungeon_map[new_y][new_x]
         enemy["X"], enemy["Y"] = new_x, new_y
         dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
         return True

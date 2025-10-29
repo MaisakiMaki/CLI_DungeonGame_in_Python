@@ -1,4 +1,4 @@
-#ゲームの現在の状態
+#ゲームの現在の状態 ("playing", "menu", "next_floor")
 game_state = "playing"
 
 player_status = {
