@@ -121,8 +121,8 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
 FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
-MAX_ENEMIES_PER_ROOM = 2
-MAX_ITEM_PER_ROOM = 2
+MAX_ENEMIES_PER_ROOM = 1
+MAX_ITEM_PER_ROOM = 3
 
 def create_empty_floor(width, height):
     # 全体が壁のからのフロア(二次元リスト)を作成する関数
@@ -162,14 +162,10 @@ def generate_dungeon(status):
 
     dungeon_map = create_empty_floor(FLOOR_WIDTH, FLOOR_HEIGHT)
     rooms = []
-
-    # 新しい敵リスト
     new_enemies_list = []
-
-    #この階層のアイテムリスト
     new_item_list = []
-
-    current_floor = status["Floor"]
+    
+    current_floor = status["Floor"] 
 
     for i in range(MAX_ROOMS):
         room_w = random.randint(5, 12)
@@ -187,19 +183,51 @@ def generate_dungeon(status):
             place_enemies(dungeon_map, new_room, new_enemies_list, current_floor)
             place_items(dungeon_map, new_room, new_item_list, current_floor)
 
-        # 通路で塞ぐ
+        # 通路で繋ぐ
         if i > 0:
             prev_center = rooms[i - 1]['center']
             current_center = new_room['center']
             connect_rooms(dungeon_map, prev_center, current_center)
     
+    # --- 修正点：ここから ---
     if rooms:
-        # 最初の部屋の中心にプレイヤーを置く
-        start_x, start_y = rooms[0]['center']
+        # 1. 最初の部屋の中心にプレイヤーの「座標」を設定
+        start_room = rooms[0]
+        start_x, start_y = start_room['center']
         status["X"], status["Y"] = start_x, start_y
 
-        end_x, end_y = rooms[-1]['center']
-        dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+        # 2. 最後の部屋に階段を置く
+        end_room = rooms[-1]
+        end_x, end_y = end_room['center']
+        
+        # 3. (重要) プレイヤーの部屋と階段の部屋が同じ場合
+        #    (つまり、部屋が1つしか生成されなかった場合)
+        if start_room == end_room: 
+            
+            # 階段の位置をプレイヤー(中心)からずらす
+            # (部屋の左上隅の、床になっている部分に置く)
+            stair_x = end_room['x'] + 1 
+            stair_y = end_room['y'] + 1
+            
+            # もしそこがプレイヤーの開始位置(中心)なら、さらにずらす
+            # (部屋が 3x3 のように小さい場合への保険じゃ)
+            if (stair_x, stair_y) == (start_x, start_y):
+                stair_x += 1 
+            
+            # 念のため、そこが床(.)か確認する
+            if dungeon_map[stair_y][stair_x] == MAP_SYMBOLS["FLOOR"]:
+                dungeon_map[stair_y][stair_x] = MAP_SYMBOLS["STAIRS"]
+            else:
+                 # それでもダメなら、もう中心に置く (上書きされるが仕方ない)
+                 dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+                
+        else:
+            # 部屋が別なら、安全に最後の部屋の中心に置く
+            dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+    
+    else:
+         add_log("エラー：部屋が生成されませんでした。")
+    # --- 修正点：ここまで ---
     
     return dungeon_map, new_enemies_list, new_item_list
 
@@ -222,7 +250,7 @@ def place_enemies(dungeon_map, room, enemies_list, current_floor):
                 # 1. 敵のステータスを辞書で定義
                 #    (今は仮)
                 base_hp = 5 + (current_floor * 2)
-                base_atk = 2 + (current_floor // 2)
+                base_atk = 3 + (current_floor // 2)
                 base_def = 1 + (current_floor // 3)
                 base_exp = 5 + current_floor
 
@@ -255,58 +283,60 @@ def place_items(dungeon_map, room, items_list, current_floor):
             item_x = random.randint(room['x'], room['x'] + room['w'] - 1)
             item_y = random.randint(room['y'], room['y'] + room['h'] - 1)
 
-            # その場所が床(.)ならアイテムを配置
             if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
 
+                # --- 修正点：ここから丸ごと置き換え ---
+                
                 new_item = None
                 
-                # アイテムテーブルを定義
-                # (確率, 最小階層, 最大階層, アイテムデータ)
-                # ※深い階層のレアアイテムを先に判定する
+                # 1. アイテムのマスターテーブル (確率は「重み」として使う)
+                # (重み, 最小階層, 最大階層, アイテムデータ)
                 item_table = [
-                    # 10階層から出現
+                    # RARE (10F+)
                     (10, 10, 99, {"name": "鋼の剣", "type": "weapon", "atk_bonus": 8, "def_bonus": 0}),
                     (10, 10, 99, {"name": "鋼の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 8}),
-                    # 5階層から出現
-                    (15, 5, 99, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
-                    (15, 5, 99, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
-                    # 1階層から出現
-                    (20, 1, 99, {"name": "こん棒", "type": "weapon", "atk_bonus": 2, "def_bonus": 0}),
-                    (20, 1, 99, {"name": "木の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 2}),
-                    (30, 1, 99, {"name": "おにぎり", "type": "food", "effect": 50}),
-                    (40, 1, 99, {"name": "薬草", "type": "potion", "effect": 10}),
+                    
+                    # UNCOMMON (5F-15F)
+                    (15, 5, 15, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
+                    (15, 5, 15, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
+                    
+                    # COMMON (1F-7F)
+                    (20, 1, 7, {"name": "こん棒", "type": "weapon", "atk_bonus": 2, "def_bonus": 0}),
+                    (20, 1, 7, {"name": "木の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 2}),
+                    
+                    # CONSUMABLES (Always)
+                    # (重みを少し増やしておきましたぞ)
+                    (35, 1, 99, {"name": "おにぎり", "type": "food", "effect": 50}),
+                    (45, 1, 99, {"name": "薬草", "type": "potion", "effect": 10}),
                 ]
 
-                # どのアイテムを生成するか、テーブルから決定する
-                item_roll = random.randint(1, 100)
-                cumulative_prob = 0 # 確率を累積
-
+                # 2. この階層で「出現候補」になるアイテムリストを作る
+                available_items = []
+                total_weight = 0
                 for (prob, min_floor, max_floor, item_data) in item_table:
+                    if min_floor <= current_floor <= max_floor:
+                        available_items.append((prob, item_data))
+                        total_weight += prob # 重みを合計
+
+                # 3. 候補リストから、重みに応じて1つ選ぶ
+                if total_weight > 0:
+                    item_roll = random.randint(1, total_weight)
+                    cumulative_prob = 0
                     
-                    # 階層チェック (この階層で出現するか？)
-                    if not (min_floor <= current_floor <= max_floor):
-                        continue # この階層では出現しない
-                        
-                    cumulative_prob += prob
-                    
-                    if item_roll <= cumulative_prob:
-                        # .copy() を使って、元の辞書が変更されないようにする
-                        # (同じアイテムが2つ出た時に、データが共有されるのを防ぐため)
-                        new_item = item_data.copy() 
-                        break
+                    for (prob, item_data) in available_items:
+                        cumulative_prob += prob
+                        if item_roll <= cumulative_prob:
+                            new_item = item_data.copy()
+                            break
                 
-                # もしテーブルの確率合計が低いなどで何も選ばれなかったら、
-                # 安全のために薬草を置いておく
+                # 4. 万が一、候補が0だった場合 (テーブル設定ミスの保険)
                 if new_item is None:
                     new_item = {"name": "薬草", "type": "potion", "effect": 10}
+                
+                # --- 修正点：ここまで ---
 
                 dungeon_map[item_y][item_x] = MAP_SYMBOLS["ITEM"]
-
-                #アイテムリストに追加
-                #x,y座標とアイテム辞書をダブルで保存
-
                 items_list.append(((item_x, item_y), new_item))
-
                 break
 
 def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
