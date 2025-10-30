@@ -1,7 +1,7 @@
 import game_data
 from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list, game_log
 from display import refresh_screen, clear_screen
-from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input, enemy_turn
+from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, get_drop_input
 
 
 def game_loop(enemies_list, items_list):
@@ -28,7 +28,11 @@ def game_loop(enemies_list, items_list):
         # 【修正】 game_state -> game_data.game_state
         elif game_data.game_state == "menu":
             action = get_menu_input()
-            is_running = handle_menu_input(player_status, items_list, action)
+            is_running = handle_menu_input(DUNGEON_MAP, player_status, enemies_list, items_list, action)
+        
+        elif game_data.game_state == "drop_menu":
+            action = get_drop_input()
+            is_running = handle_drop_input(DUNGEON_MAP, player_status, enemies_list, items_list, action)
         
         elif game_data.game_state == "next_floor":
             add_log(f"--- {player_status['Floor']}階に到達 ---")
@@ -51,7 +55,7 @@ def game_loop(enemies_list, items_list):
         # 4. HPが0になったら終了
         if player_status['HP'] <= 0:
             add_log("GAME OVER...")
-            is_running = False 
+            is_running = False
             
         # 5. ループ終了の判定
         if not is_running:

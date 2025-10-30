@@ -59,5 +59,7 @@ def refresh_screen(dungeon_map, status, enemies_list, game_log, game_state):
 
     if game_state == "menu":
         draw_menu(status["inventory"], status["Equipment"])
+    elif game_state == "drop_menu":
+        draw_menu(status["inventory"], status["Equipment"])
 
 

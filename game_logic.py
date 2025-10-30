@@ -67,7 +67,12 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
 
     add_log("移動した。")
     # 1. 元の場所を床に戻す
-    dungeon_map[current_y][current_x] = MAP_SYMBOLS["FLOOR"]
+    tile_to_set = MAP_SYMBOLS["FLOOR"]
+    for (item_x, item_y), _ in items_list:
+        if (item_x, item_y) == (current_x, current_y):
+            tile_to_set = MAP_SYMBOLS["ITEM"]
+            break
+    dungeon_map[current_y][current_x] = tile_to_set
 
     # 2. プレイヤーの位置を更新
     status['X'], status['Y'] = new_x, new_y
@@ -492,11 +497,11 @@ def pickup_item(player_status, items_list, item_x, item_y):
         add_log("エラー：見えないアイテムを拾ったみたいだね、旅人さん")
 
 def get_menu_input():
-    #メニューようの入力を受け付ける
-    move = input("使用するアイテムの番号(0, 1...) または 終了(x) を入力").lower()
+    #メニュー用の入力を受け付ける
+    move = input("使用するアイテムの番号(0, 1...)、捨てる(d)、 または 終了(x) を入力").lower()
     return move
 
-def handle_menu_input(status, items_list, action):
+def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
     #メニュー入力に応じた処理を呼び出す関数
     
     if action == "x":
@@ -504,6 +509,11 @@ def handle_menu_input(status, items_list, action):
         game_data.game_state = "playing"
         add_log("メニューを閉じた")
         return True # ゲームは続行
+    
+    elif action == "d":
+        # dが押されたら、捨てるモードに移行
+        game_data.game_state = "drop_menu"
+        add_log("何を捨てますか？")
     
     elif action.isdigit():
         #数字が入力されたら、アイテム使用/装備を試みる
@@ -538,17 +548,78 @@ def handle_menu_input(status, items_list, action):
             # アイテム使用/装備に成功したら、メニューを閉じて敵のターンへ
             game_data.game_state = "playing"
             # 敵のターンを呼び出す
-            enemy_turn(game_data.DUNGEON_MAP, status, game_data.enemies_list)
+            consume_hunger(status)
+            enemy_turn(dungeon_map, status, game_data.enemies_list)
         else:
             # アイテム使用失敗(満タンなど)または装備失敗
             # (ログは各関数内で出ているはず)
-            pass 
+            pass
             
     elif action == "q":
         return False # ゲーム終了
     
     return True # ゲーム続行
 
+def get_drop_input():
+    #捨てるアイテム用の入力
+    move = input("捨てるアイテムの番号(0, 1...) または 終了(x) を入力").lower()
+    return move
+
+def drop_item(dungeon_map, player_status, items_list, item_index):
+    #指定されたインデックスのアイテムを足元に捨てる関数
+    inventory = player_status["inventory"]
+
+    #有効なインデックスかチェック
+    if not (0 <= item_index < len(inventory)):
+        add_log("無は捨てれないよ")
+        return False
+    
+    player_x, player_y = player_status["X"], player_status["Y"]
+    target_tile = dungeon_map[player_y][player_x]
+
+    if target_tile not in [MAP_SYMBOLS["FLOOR"], MAP_SYMBOLS["PLAYER"]]:
+        if target_tile == MAP_SYMBOLS["STAIRS"]:
+            add_log("階段の上にはアイテムを置けない")
+            return False
+        if target_tile == MAP_SYMBOLS["ITEM"]:
+            add_log("アイテムの上にはアイテムを置けない")
+    
+    if dungeon_map[player_y][player_x] != MAP_SYMBOLS["PLAYER"]:
+        add_log("なぞのばしょにはアイテムを置けない")
+        return False
+    
+    item_to_drop = inventory.pop(item_index)
+
+    items_list.append(((player_x, player_y), item_to_drop))
+
+    add_log(f"{item_to_drop['name']} を足元に捨てた。")
+    return True
+
+def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
+    #捨てる入力に応じた処理を呼び出す関数
+    if action == "x":
+        # xならメニューを閉じる
+        game_data.game_state = "playing"
+        #add_log("捨てるのをやめた")
+        return True
+    
+    elif action.isdigit():
+        #数字が入力されたらアイテムを捨てる
+        item_index = int(action)
+
+        turn_consumed = drop_item(dungeon_map, status, items_list, item_index)
+
+        if turn_consumed:
+            game_data.game_state = "playing"
+            consume_hunger(status)
+            enemy_turn(dungeon_map, status, game_data.enemies_list)
+        else:
+            pass
+    
+    elif action == "q":
+        return False
+    
+    return True
 def use_item(player_status, item_index):
     #指定されたインデックスのアイテムを使用する関数
 
@@ -640,7 +711,7 @@ def equip_item(player_status, item_index):
     else:
         add_log(f"{item_to_equip.get('name')} を装備した!")
     
-    return False
+    return True
     
 def get_total_atk(player_status):
     # 素のAtkと装備品のAtkボーナスを合計した値を返す
