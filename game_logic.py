@@ -92,7 +92,7 @@ def consume_hunger(status):
             status["HP"] += 1
     else:
         status['HP'] -= 1
-        
+
     status["turn_counter_for_hunger"] += 1
 
     if status["turn_counter_for_hunger"] >= 10:
@@ -368,12 +368,25 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     
     # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
     player_atk = get_total_atk(player_status)
-    damage = max(0, player_atk - target_enemy["Def"])
+    enemy_def = target_enemy["Def"]
+
+    base_damage = (player_atk * 100) // (100 + enemy_def)
+
+    if player_atk <= 0:
+        damage = 0
+    
+    if base_damage <= 0:
+        damage = 0
+    
+    else:
+        variance = random.uniform(0.9, 1.1)
+        damage = round(base_damage * variance)
+    
     enemy_pos = (target_enemy["X"], target_enemy["Y"])
 
     if damage > 0:
         target_enemy["HP"] -= damage
-        add_log(f"敵{enemy_pos}に{damage}のダメージを与えた! (敵{enemy_pos}残りHP: {target_enemy['HP']})")
+        add_log(f"敵{enemy_pos}に{damage}のダメージを与えた! (敵{enemy_pos}残りHP: {target_enemy['HP'] if target_enemy['HP'] > 0 else '0'})")
     else:
         add_log("敵は攻撃を弾いた！")
     
@@ -443,9 +456,21 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
 def enemy_attack_player(enemy, player_status):
     #敵がプレイヤーを攻撃する関数
 
-    #ダメージ計算はアルテリオス
     player_def = get_total_def(player_status)
-    damage = max(0, enemy["Atk"] - player_def)
+    enemy_atk = enemy["Atk"]
+
+    base_damage = (enemy_atk * 100) // (100 + player_def)
+
+    if enemy_atk <= 0:
+        damage = 0
+    
+    if base_damage <= 0:
+        damage = 0
+    
+    else:
+        variance = random.uniform(0.9, 1.1)
+        damage = round(base_damage * variance)
+    
     enemy_pos = (enemy['X'], enemy['Y'])
 
     if damage > 0:
