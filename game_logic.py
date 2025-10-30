@@ -447,29 +447,56 @@ def get_menu_input():
 
 def handle_menu_input(status, items_list, action):
     #メニュー入力に応じた処理を呼び出す関数
-    global game_state
     
     if action == "x":
         # xならメニューを閉じる
         game_data.game_state = "playing"
         add_log("メニューを閉じた")
+        return True # ゲームは続行
     
     elif action.isdigit():
-        #数字が入力されたら、アイテム使用を試みる
+        #数字が入力されたら、アイテム使用/装備を試みる
         item_index = int(action)
-        item_used = use_item(status, item_index)
+        inventory = status["inventory"]
 
-        if item_used:
-            #アイテムを使ったら自動でメニューを閉じてターンが進む
+        # 1. 有効なインデックスかチェック
+        if not (0 <= item_index < len(inventory)):
+            add_log("その番号のアイテムは持っていない。")
+            return True # ゲームは続行 (ターン消費なし)
+        
+        # 2. アイテムの種類によって処理を分岐
+        item = inventory[item_index]
+        item_type = item.get("type", "unknown")
+        
+        turn_consumed = False # ターンが消費されたか
+
+        if item_type in ["potion", "food"]:
+            # 消費アイテムの場合
+            turn_consumed = use_item(status, item_index)
+        
+        elif item_type in ["weapon", "shield"]:
+            # 装備アイテムの場合
+            turn_consumed = equip_item(status, item_index)
+            
+        else:
+            # どちらでもない場合
+            add_log(f"{item.get('name')} は使ったり装備したりできない。")
+
+        # 3. ターン消費の処理
+        if turn_consumed:
+            # アイテム使用/装備に成功したら、メニューを閉じて敵のターンへ
             game_data.game_state = "playing"
-            # TODO: 敵のターンをここで呼び出す
+            # 敵のターンを呼び出す
             enemy_turn(game_data.DUNGEON_MAP, status, game_data.enemies_list)
-
-    
+        else:
+            # アイテム使用失敗(満タンなど)または装備失敗
+            # (ログは各関数内で出ているはず)
+            pass 
+            
     elif action == "q":
-        return False
+        return False # ゲーム終了
     
-    return True
+    return True # ゲーム続行
 
 def use_item(player_status, item_index):
     #指定されたインデックスのアイテムを使用する関数
@@ -524,6 +551,45 @@ def use_item(player_status, item_index):
     else:
         add_log(f"{item_to_use['name']} は今使えない。")
         return False
+
+def equip_item(player_status, item_index):
+    # 指定されたインデックスのアイテムを装備する関数
+    inventory = player_status["inventory"]
+
+    # アイテムが存在するか確認
+    if not (0 <= item_index < len(inventory)):
+        add_log("エラー: 無は装備できないよ")
+        return False
+    
+    item_to_equip = inventory[item_index]
+    item_type = item_to_equip.get("type")
+
+    # 装備スロットを決定
+
+    equip_slot = None
+    if item_type == "weapon":
+        equip_slot = "weapon"
+    elif item_type == "shield":
+        equip_slot = "shield"
+    else:
+       add_log(f"{item_to_equip.get('name')} は装備できない。")
+       return False
+    
+    # 装備の交換処理
+    current_equipment = player_status["Equipment"].get(equip_slot)
+
+    player_status["Equipment"][equip_slot] = item_to_equip
+
+    inventory.pop(item_index)
+
+    # 古い装備をインベントリに戻す
+    if current_equipment:
+        inventory.append(current_equipment)
+        add_log(f"{current_equipment.get('name')} を外し、 {item_to_equip.get('name')} を装備した!")
+    else:
+        add_log(f"{item_to_equip.get('name')} を装備した!")
+    
+    return False
     
 def get_total_atk(player_status):
     # 素のAtkと装備品のAtkボーナスを合計した値を返す
@@ -578,3 +644,4 @@ def level_up(player_status):
 
     add_log(f"レベルが {player_status['Lv']} に上がった!")
     add_log(f"最大HPが {level_data['Max_HP_Up']}、攻撃力が {level_data['Atk_Up']}、防御力が {level_data['Def_Up']} 上がった!")
+
