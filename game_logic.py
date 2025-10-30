@@ -88,8 +88,9 @@ def consume_hunger(status):
     status['Hung'] = max(0, status['Hung'] - 1)
 
     if status['Hung'] == 0:
-        print("空腹でもう動けない...")
+        add_log("空腹で倒れそうだ...")
         # HP減少ロジックなどを追加
+        status['HP'] -= 1
     
 
 def handle_input(dungeon_map, status, enemies_list, items_list, move):
@@ -168,6 +169,8 @@ def generate_dungeon(status):
     #この階層のアイテムリスト
     new_item_list = []
 
+    current_floor = status["Floor"]
+
     for i in range(MAX_ROOMS):
         room_w = random.randint(5, 12)
         room_h = random.randint(4, 9)
@@ -181,8 +184,8 @@ def generate_dungeon(status):
 
         # 最初の部屋以外に敵を配置する
         if i > 0:
-            place_enemies(dungeon_map, new_room, new_enemies_list)
-            place_items(dungeon_map, new_room, new_item_list)
+            place_enemies(dungeon_map, new_room, new_enemies_list, current_floor)
+            place_items(dungeon_map, new_room, new_item_list, current_floor)
 
         # 通路で塞ぐ
         if i > 0:
@@ -200,7 +203,7 @@ def generate_dungeon(status):
     
     return dungeon_map, new_enemies_list, new_item_list
 
-def place_enemies(dungeon_map, room, enemies_list):
+def place_enemies(dungeon_map, room, enemies_list, current_floor):
     # 部屋の中にランダムに敵を配置する関数
 
     # この部屋に何体の敵を置くか決める
@@ -218,11 +221,16 @@ def place_enemies(dungeon_map, room, enemies_list):
 
                 # 1. 敵のステータスを辞書で定義
                 #    (今は仮)
+                base_hp = 5 + (current_floor * 2)
+                base_atk = 2 + (current_floor // 2)
+                base_def = 1 + (current_floor // 3)
+                base_exp = 5 + current_floor
+
                 new_enemy = {
-                    "HP": 5,
-                    "Atk": 2,
-                    "Def": 1,
-                    "Exp": 5,
+                    "HP": base_hp,
+                    "Atk": base_atk,
+                    "Def": base_def,
+                    "Exp": base_exp,
                     "X": enemy_x,
                     "Y": enemy_y,
                     "standing_on": MAP_SYMBOLS["FLOOR"]
@@ -237,7 +245,7 @@ def place_enemies(dungeon_map, room, enemies_list):
                 # 1体配置したら次の敵へ
                 break
 
-def place_items(dungeon_map, room, items_list):
+def place_items(dungeon_map, room, items_list, current_floor):
     # 部屋の中にランダムにアイテムを配置する関数
 
     num_items = random.randint(0, MAX_ITEM_PER_ROOM)
@@ -250,35 +258,48 @@ def place_items(dungeon_map, room, items_list):
             # その場所が床(.)ならアイテムを配置
             if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
 
-                item_roll = random.randint(1, 100)
                 new_item = None
+                
+                # アイテムテーブルを定義
+                # (確率, 最小階層, 最大階層, アイテムデータ)
+                # ※深い階層のレアアイテムを先に判定する
+                item_table = [
+                    # 10階層から出現
+                    (10, 10, 99, {"name": "鋼の剣", "type": "weapon", "atk_bonus": 8, "def_bonus": 0}),
+                    (10, 10, 99, {"name": "鋼の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 8}),
+                    # 5階層から出現
+                    (15, 5, 99, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
+                    (15, 5, 99, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
+                    # 1階層から出現
+                    (20, 1, 99, {"name": "こん棒", "type": "weapon", "atk_bonus": 2, "def_bonus": 0}),
+                    (20, 1, 99, {"name": "木の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 2}),
+                    (30, 1, 99, {"name": "おにぎり", "type": "food", "effect": 50}),
+                    (40, 1, 99, {"name": "薬草", "type": "potion", "effect": 10}),
+                ]
 
-                if item_roll <= 40:
-                    new_item = {
-                        "name": "薬草",
-                        "type": "potion",
-                        "effect": 10 # 10回復
-                    }
-                elif item_roll <= 70:
-                    new_item = {
-                        "name": "おにぎり",
-                        "type": "food",
-                        "effect": 50 # 10回復
-                    }
-                elif item_roll <= 85:
-                    new_item = {
-                        "name": "こんぼう",
-                        "type": "weapon",
-                        "atk_bonus": 2,
-                        "def_bonus": 0
-                    }
-                else:
-                    new_item = {
-                        "name": "木の盾",
-                        "type": "shield",
-                        "atk_bonus": 0,
-                        "def_bonus": 2 # 防御力 +2
-                    }
+                # どのアイテムを生成するか、テーブルから決定する
+                item_roll = random.randint(1, 100)
+                cumulative_prob = 0 # 確率を累積
+
+                for (prob, min_floor, max_floor, item_data) in item_table:
+                    
+                    # 階層チェック (この階層で出現するか？)
+                    if not (min_floor <= current_floor <= max_floor):
+                        continue # この階層では出現しない
+                        
+                    cumulative_prob += prob
+                    
+                    if item_roll <= cumulative_prob:
+                        # .copy() を使って、元の辞書が変更されないようにする
+                        # (同じアイテムが2つ出た時に、データが共有されるのを防ぐため)
+                        new_item = item_data.copy() 
+                        break
+                
+                # もしテーブルの確率合計が低いなどで何も選ばれなかったら、
+                # 安全のために薬草を置いておく
+                if new_item is None:
+                    new_item = {"name": "薬草", "type": "potion", "effect": 10}
+
                 dungeon_map[item_y][item_x] = MAP_SYMBOLS["ITEM"]
 
                 #アイテムリストに追加
@@ -637,7 +658,7 @@ def level_up(player_status):
     player_status["Def"] += level_data["Def_Up"]
 
     player_status["HP"] = player_status["Max_HP"]
-    player_status["Hung"] = player_status["Max_Hung"]
+    # player_status["Hung"] = player_status["Max_Hung"]
 
     player_status["Exp"] -= player_status["Next_Exp"]
     player_status["Next_Exp"] = level_data["Next_Exp"]
