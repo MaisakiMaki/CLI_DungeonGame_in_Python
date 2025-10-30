@@ -1,16 +1,35 @@
 from game_data import player_status
 from game_logic import get_total_atk, get_total_def
+import game_data
 
 def clear_screen():
     # ターミナル画面をクリアにする関数
     print("\n" * 50)
 
-def draw_map(dungeon_map):
+def draw_map(dungeon_map, player_status, enemies_list, items_list):
     # マップの表示関数
     print(f"--- 鳳の間 {player_status['Floor']}階 ---")
 
+    #元の地形マップをディープコピー
+    display_map = [row[:] for row in dungeon_map]
+
+    for (ix, iy), item_data in items_list:
+        if 0 <= iy < len(display_map) and 0 <= ix < len(display_map[0]):
+            display_map[iy][ix] = game_data.MAP_SYMBOLS["ITEM"]
+
+    #敵をコピーしたマップに上書き
+    for enemy in enemies_list:
+        ex, ey = enemy['X'], enemy['Y']
+        # マップ範囲内かチェック
+        if 0 < ey < len(display_map) and 0 <= ex < len(display_map[0]):
+            display_map[ey][ex] = game_data.MAP_SYMBOLS["ENEMY"]
+    
+    px, py = player_status['X'], player_status['Y']
+    if 0 <= py < len(display_map) and 0 <= px < len(display_map[0]):
+        display_map[py][px] = game_data.MAP_SYMBOLS["PLAYER"]
+
     # マップの描画
-    for row in dungeon_map:
+    for row in display_map:
         print("".join(row))
 
 def draw_status(status):
@@ -51,9 +70,9 @@ def draw_menu(inventory, Equipment):
             print(f"{i}: {item['name']}")
     print("-" * 30)
 
-def refresh_screen(dungeon_map, status, enemies_list, game_log, game_state):
+def refresh_screen(dungeon_map, status, enemies_list, items_list, game_log, game_state):
     # 画面全体を更新する関数
-    draw_map(dungeon_map)
+    draw_map(dungeon_map, status, enemies_list, items_list)
     draw_status(status)
     draw_log(game_log)
 

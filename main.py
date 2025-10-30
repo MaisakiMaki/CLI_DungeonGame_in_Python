@@ -16,7 +16,7 @@ def game_loop(enemies_list, items_list):
         
         # 2. 最新の状態を描画
         # 【修正】 game_state -> game_data.game_state
-        refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log, game_data.game_state)
+        refresh_screen(DUNGEON_MAP, player_status, enemies_list, items_list, game_log, game_data.game_state)
 
         # 3. ゲームの状態によって処理を分岐
         
@@ -46,8 +46,6 @@ def game_loop(enemies_list, items_list):
             items_list.clear()
             items_list.extend(new_items_list)
 
-            DUNGEON_MAP[player_status['Y']][player_status['X']] = MAP_SYMBOLS["PLAYER"]
-
             game_data.game_state = "playing"
 
             enemy_turn(DUNGEON_MAP, player_status, enemies_list)
@@ -61,7 +59,7 @@ def game_loop(enemies_list, items_list):
         if not is_running:
             clear_screen()
             # 【修正】 game_state -> game_data.game_state
-            refresh_screen(DUNGEON_MAP, player_status, enemies_list, game_log, game_data.game_state)
+            refresh_screen(DUNGEON_MAP, player_status, enemies_list, items_list, game_log, game_data.game_state)
             if player_status['HP'] <= 0:
                 print("GAME OVER...")
             else:
@@ -75,7 +73,6 @@ if __name__ == "__main__":
 
     # 初期位置をマップに反映(最初のセットアップ)
     DUNGEON_MAP, new_enemies_list, new_items_list = generate_dungeon(player_status)
-    DUNGEON_MAP[player_status['Y']][player_status['X']] = MAP_SYMBOLS["PLAYER"]
 
     # 敵やアイテムの初期配置ロジックはここに
 

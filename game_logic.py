@@ -30,98 +30,64 @@ def is_valid_move(dungeon_map, target_x, target_y):
     
 def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
     #プレイヤーの移動とマップの更新を行う関数
-
-    # 現在地の座標
     current_x, current_y = status['X'], status['Y']
-
-    #移動先の座標
     new_x, new_y = current_x + dx , current_y + dy
 
-    # 壁かどうかだけチェック
-    if not is_valid_move(dungeon_map, new_x, new_y):
-        return False
-    
-    # 移動先の中身をチェック
-    target_tile = dungeon_map[new_y][new_x]
+    # --- 修正点：ここから丸ごと置き換え ---
 
-    if target_tile == MAP_SYMBOLS["ENEMY"]:
-        # 移動先が敵のため、攻撃
-        print("敵に攻撃!")
+    # 1. 移動先が「敵」か？ (enemies_list を直接チェック)
+    target_enemy = None
+    for enemy in enemies_list:
+        if enemy["X"] == new_x and enemy["Y"] == new_y:
+            target_enemy = enemy
+            break
+            
+    if target_enemy:
+        # 敵がいた -> 攻撃
+        add_log("敵に攻撃!") # (print を add_log に修正)
         combat(dungeon_map, status, enemies_list, new_x, new_y)
         consume_hunger(status)
-        return True
-    
-    elif target_tile == MAP_SYMBOLS["STAIRS"]:
-        # 移動先が階段のため、降りる
-        add_log("階段を見つけた! 次の階層へ進む...")
-        # 階層レベルを上げる
-        status["Floor"] += 1
+        return True # 行動終了 (移動しない)
 
+    # 2. 移動先が「壁」か？ (dungeon_map をチェック)
+    if not is_valid_move(dungeon_map, new_x, new_y):
+        return False # 行動失敗 (移動しない)
+    
+    # 3. 移動先が「階段」か？ (dungeon_map をチェック)
+    target_tile = dungeon_map[new_y][new_x]
+    if target_tile == MAP_SYMBOLS["STAIRS"]:
+        add_log("階段を見つけた! 次の階層へ進む...")
+        status["Floor"] += 1
         game_data.game_state = "next_floor"
         return True
-    
-    elif target_tile == MAP_SYMBOLS["ITEM"]:
-        
-        # 1. まず、その座標にあるアイテムを items_list から探す
-        target_item_data = None
-        item_to_remove = None # 拾う場合に備えて、リスト本体も覚えておく
-        for item in items_list:
-            coords, data = item
-            if coords == (new_x, new_y): # (new_x, new_y) は移動先の座標
-                target_item_data = data
-                item_to_remove = item
-                break
 
-        # 2. アイテムが見つかったかどうかで分岐
-        if target_item_data:
-            # --- アイテムが見つかった ---
+    # 4. 移動先が「アイテム」か？ (items_list を直接チェック)
+    target_item_data = None
+    item_to_remove = None
+    for item in items_list:
+        coords, data = item
+        if coords == (new_x, new_y):
+            target_item_data = data
+            item_to_remove = item
+            break
             
-            # 2a. 持ち物がいっぱいかチェック
-            if len(status["inventory"]) >= MAX_INVENTORY_SIZE:
-                # 満タンの場合：
-                # (君の要望) どのアイテムの上に乗ったかログを出す
-                add_log(f"持ち物がいっぱいで、{target_item_data['name']} の上に乗った。")
-                # 拾わずに、そのまま下の「移動した。」処理へ進む
-                pass
-            
-            else:
-                # 持ち物に空きがある場合：
-                # (pickup_item のロジックをここで実行)
-                status["inventory"].append(target_item_data)
-                items_list.remove(item_to_remove)
-                add_log(f"{target_item_data['name']} を拾った!")
-                # そのまま下の「移動した。」処理へ進む
-
+    if target_item_data:
+        # アイテムが見つかった
+        if len(status["inventory"]) >= MAX_INVENTORY_SIZE:
+            # 満タン
+            add_log(f"持ち物がいっぱいで、{target_item_data['name']} の上に乗った。")
         else:
-            # --- アイテムが見つからなかった ---
-            # (これは「見えないアイテム」バグ)
-            add_log("（しかし、そこには何もなかった）")
-            # そのまま下の「移動した。」処理へ進む
-            pass
-    
+            # 空きあり -> 拾う
+            status["inventory"].append(target_item_data)
+            items_list.remove(item_to_remove) # データから削除
+            add_log(f"{target_item_data['name']} を拾った!")
+            # (dungeon_map の '!' は元から無いので、消す必要もない)
 
-    #add_log("移動した。")
-    # 1. 元の場所を床に戻す
-    # 1. 元の場所をどうするか？
-    #    (元の場所にアイテムリストのアイテムがあるか？)
-    tile_to_set = MAP_SYMBOLS["FLOOR"] # 基本は床(.)
-    for (item_x, item_y), _ in items_list:
-        if (item_x, item_y) == (current_x, current_y):
-            # 満タンで踏んだアイテムが、ここ(元の場所)にあるはず
-            tile_to_set = MAP_SYMBOLS["ITEM"] 
-            break # ループ終了
-    dungeon_map[current_y][current_x] = tile_to_set
-
-    # 2. プレイヤーの位置を更新
+    # 5. 何も無かった (or アイテムの上に乗った) -> 移動
     status['X'], status['Y'] = new_x, new_y
-
-    # 3. 新しい場所にプレイヤーシンボルを置く
-    dungeon_map[new_y][new_x] = MAP_SYMBOLS["PLAYER"]
-
-    # 4. 空腹度の消費
     consume_hunger(status)
-
-    return True #移動成功
+    return True # 移動成功
+    # --- 修正点：ここまで ---
 
 def consume_hunger(status):
     # 空腹度を計算する関数
@@ -173,7 +139,7 @@ FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
 MAX_ROOMS_TRIES = 50
 MAX_ENEMIES_PER_ROOM = 1
-MAX_ITEM_PER_ROOM = 3
+MAX_ITEM_PER_ROOM = 2
 SIGHT_RANGE = 8
 MAX_INVENTORY_SIZE = 10
 
@@ -229,62 +195,55 @@ def generate_dungeon(status):
     # ダンジョンマップ全体を生成するメイン関数 敵リストも追加
 
     dungeon_map = create_empty_floor(FLOOR_WIDTH, FLOOR_HEIGHT)
-    rooms = [] # <--- 実際に生成できた部屋だけが入るリスト
+    rooms = [] 
     new_enemies_list = []
     new_item_list = []
     
     current_floor = status["Floor"]
 
-    # --- 修正点：ロジックを大幅に変更 ---
+    # --- 修正点：ここから ---
     
-    # MAX_ROOMS 回「試行」する
-    for _ in range(MAX_ROOMS_TRIES):
+    # 1. まず「部屋」と「通路」だけを先に全部作る
+    for _ in range(MAX_ROOMS_TRIES): 
         room_w = random.randint(5, 12)
         room_h = random.randint(4, 9)
         room_x = random.randint(1, FLOOR_WIDTH - room_w - 1)
         room_y = random.randint(1, FLOOR_HEIGHT - room_h - 1)
 
-        # 1. 部屋の重なりチェック
         new_coords = (room_x, room_y, room_w, room_h)
         if check_room_overlap(new_coords, rooms):
-            continue # 重なったら、この試行はあきらめる
+            continue 
         
-        # 2. 重なっていない -> 部屋を実際に作る
         new_room = create_room(dungeon_map, room_x, room_y, room_w, room_h)
         rooms.append(new_room)
         
-        # 3. 部屋が「2個以上」になったか？
         if len(rooms) > 1:
-            # (この時点で、new_room は rooms[-1]、
-            #  1個前の部屋は rooms[-2] に入っている)
-            
-            # 3a. 敵とアイテムを配置 (最初の部屋 rooms[0] には置かない)
-            place_enemies(dungeon_map, new_room, new_enemies_list, current_floor)
-            place_items(dungeon_map, new_room, new_item_list, current_floor)
-
-            # 3b. 1個前の部屋と、今作った部屋を繋ぐ
-            prev_center = rooms[-2]['center'] # <--- i-1 ではなく -2
+            # 1個前の部屋と、今作った部屋を繋ぐ
+            prev_center = rooms[-2]['center'] 
             current_center = new_room['center']
             connect_rooms(dungeon_map, prev_center, current_center)
-
-            if len(rooms) >= MAX_ROOMS:
-                break
-
+            
+        if len(rooms) >= MAX_ROOMS:
+            break
+            
     # --- 修正点：ここまで ---
 
     if rooms:
+        # 2. プレイヤーを「最初の部屋」に配置
         start_room = rooms[0]
         start_x, start_y = start_room['center']
         status["X"], status["Y"] = start_x, start_y
 
+        # 3. (重要) 階段を「最後の部屋」に先に置く
         end_room = rooms[-1]
         end_x, end_y = end_room['center']
         
-        if start_room == end_room:
-            stair_x = end_room['x'] + 1
+        if start_room == end_room: 
+            # (部屋が1つしかない場合の安全処理はそのまま)
+            stair_x = end_room['x'] + 1 
             stair_y = end_room['y'] + 1
             if (stair_x, stair_y) == (start_x, start_y):
-                stair_x += 1
+                stair_x += 1 
             
             if dungeon_map[stair_y][stair_x] == MAP_SYMBOLS["FLOOR"]:
                 dungeon_map[stair_y][stair_x] = MAP_SYMBOLS["STAIRS"]
@@ -292,6 +251,15 @@ def generate_dungeon(status):
                  dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
         else:
             dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+            
+        # --- 修正点：ここから ---
+        # 4. 「その後で」敵とアイテムを配置する
+        #    (最初の部屋 rooms[0] には置かない)
+        for room in rooms[1:]:
+            place_enemies(dungeon_map, room, new_enemies_list, current_floor)
+            place_items(dungeon_map, room, new_item_list, current_floor)
+        # --- 修正点：ここまで ---
+
     else:
          add_log("エラー：部屋が生成されませんでした。")
     
@@ -334,7 +302,6 @@ def place_enemies(dungeon_map, room, enemies_list, current_floor):
                 enemies_list.append(new_enemy)
 
                 # 3. マップに 'E' を書き込む
-                dungeon_map[enemy_y][enemy_x] = MAP_SYMBOLS["ENEMY"]
 
                 # 1体配置したら次の敵へ
                 break
@@ -350,6 +317,15 @@ def place_items(dungeon_map, room, items_list, current_floor):
             item_y = random.randint(room['y'], room['y'] + room['h'] - 1)
 
             if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
+                is_occupied = False
+
+                for(existing_x, existing_y), _ in items_list:
+                    if (existing_x, existing_y) == (item_x, item_y):
+                        is_occupied = True
+                        break
+                
+                if is_occupied:
+                    continue
 
                 # --- 修正点：ここから丸ごと置き換え ---
                 
@@ -401,7 +377,6 @@ def place_items(dungeon_map, room, items_list, current_floor):
                 
                 # --- 修正点：ここまで ---
 
-                dungeon_map[item_y][item_x] = MAP_SYMBOLS["ITEM"]
                 items_list.append(((item_x, item_y), new_item))
                 break
 
@@ -450,7 +425,6 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
         enemy_exp = target_enemy.get("Exp", 1)
         gain_experience(player_status, enemy_exp)
         # マップから 'E' を消して床 '.' にする
-        dungeon_map[enemy_y][enemy_x] = target_enemy["standing_on"]
         # 敵のリストから削除する
         enemies_list.remove(target_enemy)
 
@@ -554,47 +528,40 @@ def enemy_attack_player(enemy, player_status):
 def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
     """
     敵が (new_x, new_y) へ移動または攻撃を試みる関数
-    Ver.4 (アイテム/階段の上もOK)
+    Ver.5 (手術完了版)
     """
 
     # 0. 移動先が現在地と同じなら失敗
     if new_x == enemy["X"] and new_y == enemy["Y"]:
         return False
     
-    # 1. 移動先がマップ範囲外かチェック
-    if not (0 <= new_y < FLOOR_HEIGHT and 0 <= new_x < FLOOR_WIDTH):
-        return False
-        
-    target_tile = dungeon_map[new_y][new_x]
-    
-    # 2. 移動先はプレイヤー？
-    if target_tile == MAP_SYMBOLS["PLAYER"]:
-        enemy_attack_player(enemy, player_status)
-        return True
-    
     # --- 修正点：ここから ---
-    
-    # 3. 移動先は「壁」または「他の敵」か？
-    #    (この2つ "以外" なら、移動できる)
-    if target_tile in [MAP_SYMBOLS["WALL"], MAP_SYMBOLS["ENEMY"]]:
-        return False # 移動失敗
-        
-    # --- 修正点：ここまで ---
 
+    # 1. 移動先はプレイヤーか？ (player_status を直接チェック)
+    if new_x == player_status["X"] and new_y == player_status["Y"]:
+        enemy_attack_player(enemy, player_status)
+        return True # 攻撃成功
+
+    # 2. 移動先は「壁」か？ (dungeon_map をチェック)
+    if not (0 <= new_y < FLOOR_HEIGHT and 0 <= new_x < FLOOR_WIDTH) or \
+       dungeon_map[new_y][new_x] == MAP_SYMBOLS["WALL"]:
+        return False # 壁には移動しない
+        
+    # 3. 移動先は「他の敵」か？ (enemies_list をチェック)
+    for other_enemy in game_data.enemies_list: # (game_data.enemies_list を参照)
+        if other_enemy is not enemy and \
+           other_enemy["X"] == new_x and other_enemy["Y"] == new_y:
+            return False # 他の敵の上には移動しない
+    
+    # --- 修正点：ここまで ---
     # 4. 移動実行
-    #    (移動先は 床, アイテム, 階段 のいずれか)
-    
-    # 元いた場所を、隠していたタイル(床, アイテム, 階段)に戻す
-    dungeon_map[enemy["Y"]][enemy["X"]] = enemy["standing_on"]
-    
+    # (移動先は 床, アイテム, 階段 のいずれか)
     # 新しい場所のタイル(床, アイテム, 階段)を 'standing_on' に保存
-    enemy["standing_on"] = target_tile 
+    enemy["standing_on"] = dungeon_map[new_y][new_x]
     
     # 座標を更新
     enemy["X"], enemy["Y"] = new_x, new_y
     
-    # マップに 'E' を書き込む
-    dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
     return True
 
 def get_menu_input():
@@ -719,9 +686,6 @@ def drop_item(dungeon_map, player_status, items_list, item_index):
         
         # 5a. 捨てたアイテムを items_list に追加 (足元に置く)
         items_list.append(((player_x, player_y), item_to_drop))
-        
-        # 5b. マップの見た目を '!' に変更
-        dungeon_map[player_y][player_x] = MAP_SYMBOLS["ITEM"]
         
         add_log(f"{item_to_drop['name']} を足元に捨てた。")
 
