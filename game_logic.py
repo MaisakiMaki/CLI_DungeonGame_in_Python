@@ -171,6 +171,7 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
 FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
+MAX_ROOMS_TRIES = 50
 MAX_ENEMIES_PER_ROOM = 1
 MAX_ITEM_PER_ROOM = 3
 SIGHT_RANGE = 8
@@ -209,77 +210,90 @@ def connect_rooms(dungeon_map, start_point, end_point):
         if 1 <= x2 < FLOOR_WIDTH - 1 and 1 <= y < FLOOR_HEIGHT - 1: # <--- 修正②： y を使う
             dungeon_map[y][x2] = MAP_SYMBOLS["FLOOR"]
 
+def check_room_overlap(new_room_coords, existing_rooms):
+    # 新しい部屋の座標が、既存の部屋のリストと重なって開花をチェックする関数
+    # (x1, y1, w1, h1)は新た強い部屋の座標とサイズ
+
+    x1, y1, w1, h1 = new_room_coords
+
+    #既存の各部屋(room)と重なりをチェック
+    for room in existing_rooms:
+        x2, y2, w2, h2 = room['x'], room['y'], room['w'], room['h']
+        if (x1 < x2 + w2 + 1 and x1 + w1 + 1 < x2 and
+            y1 < y2 + h2 + 1 and y1 + h1 + 1 > y2):
+            return True
+        
+    return False
+
 def generate_dungeon(status):
     # ダンジョンマップ全体を生成するメイン関数 敵リストも追加
 
     dungeon_map = create_empty_floor(FLOOR_WIDTH, FLOOR_HEIGHT)
-    rooms = []
+    rooms = [] # <--- 実際に生成できた部屋だけが入るリスト
     new_enemies_list = []
     new_item_list = []
     
-    current_floor = status["Floor"] 
+    current_floor = status["Floor"]
 
-    for i in range(MAX_ROOMS):
+    # --- 修正点：ロジックを大幅に変更 ---
+    
+    # MAX_ROOMS 回「試行」する
+    for _ in range(MAX_ROOMS_TRIES):
         room_w = random.randint(5, 12)
         room_h = random.randint(4, 9)
         room_x = random.randint(1, FLOOR_WIDTH - room_w - 1)
         room_y = random.randint(1, FLOOR_HEIGHT - room_h - 1)
 
-        # TODO: 部屋の重なりチェックはあとで実装。
-
+        # 1. 部屋の重なりチェック
+        new_coords = (room_x, room_y, room_w, room_h)
+        if check_room_overlap(new_coords, rooms):
+            continue # 重なったら、この試行はあきらめる
+        
+        # 2. 重なっていない -> 部屋を実際に作る
         new_room = create_room(dungeon_map, room_x, room_y, room_w, room_h)
         rooms.append(new_room)
-
-        # 最初の部屋以外に敵を配置する
-        if i > 0:
+        
+        # 3. 部屋が「2個以上」になったか？
+        if len(rooms) > 1:
+            # (この時点で、new_room は rooms[-1]、
+            #  1個前の部屋は rooms[-2] に入っている)
+            
+            # 3a. 敵とアイテムを配置 (最初の部屋 rooms[0] には置かない)
             place_enemies(dungeon_map, new_room, new_enemies_list, current_floor)
             place_items(dungeon_map, new_room, new_item_list, current_floor)
 
-        # 通路で繋ぐ
-        if i > 0:
-            prev_center = rooms[i - 1]['center']
+            # 3b. 1個前の部屋と、今作った部屋を繋ぐ
+            prev_center = rooms[-2]['center'] # <--- i-1 ではなく -2
             current_center = new_room['center']
             connect_rooms(dungeon_map, prev_center, current_center)
-    
-    # --- 修正点：ここから ---
+
+            if len(rooms) >= MAX_ROOMS:
+                break
+
+    # --- 修正点：ここまで ---
+
     if rooms:
-        # 1. 最初の部屋の中心にプレイヤーの「座標」を設定
         start_room = rooms[0]
         start_x, start_y = start_room['center']
         status["X"], status["Y"] = start_x, start_y
 
-        # 2. 最後の部屋に階段を置く
         end_room = rooms[-1]
         end_x, end_y = end_room['center']
         
-        # 3. (重要) プレイヤーの部屋と階段の部屋が同じ場合
-        #    (つまり、部屋が1つしか生成されなかった場合)
-        if start_room == end_room: 
-            
-            # 階段の位置をプレイヤー(中心)からずらす
-            # (部屋の左上隅の、床になっている部分に置く)
-            stair_x = end_room['x'] + 1 
+        if start_room == end_room:
+            stair_x = end_room['x'] + 1
             stair_y = end_room['y'] + 1
-            
-            # もしそこがプレイヤーの開始位置(中心)なら、さらにずらす
-            # (部屋が 3x3 のように小さい場合への保険じゃ)
             if (stair_x, stair_y) == (start_x, start_y):
-                stair_x += 1 
+                stair_x += 1
             
-            # 念のため、そこが床(.)か確認する
             if dungeon_map[stair_y][stair_x] == MAP_SYMBOLS["FLOOR"]:
                 dungeon_map[stair_y][stair_x] = MAP_SYMBOLS["STAIRS"]
             else:
-                 # それでもダメなら、もう中心に置く (上書きされるが仕方ない)
                  dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
-                
         else:
-            # 部屋が別なら、安全に最後の部屋の中心に置く
             dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
-    
     else:
          add_log("エラー：部屋が生成されませんでした。")
-    # --- 修正点：ここまで ---
     
     return dungeon_map, new_enemies_list, new_item_list
 
@@ -818,11 +832,6 @@ def equip_item(player_status, item_index):
     # 装備の交換処理
     current_equipment = player_status["Equipment"].get(equip_slot)
 
-    if current_equipment:
-        if len(player_status["inventory"]) >= MAX_INVENTORY_SIZE:
-            add_log(f"持ち物がいっぱいで {current_equipment('name')} を外せない!")
-            return False
-
     player_status["Equipment"][equip_slot] = item_to_equip
 
     inventory.pop(item_index)
@@ -889,4 +898,7 @@ def level_up(player_status):
 
     add_log(f"レベルが {player_status['Lv']} に上がった!")
     add_log(f"最大HPが {level_data['Max_HP_Up']}、攻撃力が {level_data['Atk_Up']}、防御力が {level_data['Def_Up']} 上がった!")
+
+
+
 

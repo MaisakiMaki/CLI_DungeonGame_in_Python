@@ -3,7 +3,7 @@ game_state = "playing"
 
 player_status = {
     "Lv": 1,
-    "HP": 10,
+    "HP": 20,
     "Max_HP": 20,
     "Atk": 5,
     "Def": 3,
