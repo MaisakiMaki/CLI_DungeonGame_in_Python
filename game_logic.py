@@ -61,17 +61,55 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
         return True
     
     elif target_tile == MAP_SYMBOLS["ITEM"]:
+        
+        # 1. まず、その座標にあるアイテムを items_list から探す
+        target_item_data = None
+        item_to_remove = None # 拾う場合に備えて、リスト本体も覚えておく
+        for item in items_list:
+            coords, data = item
+            if coords == (new_x, new_y): # (new_x, new_y) は移動先の座標
+                target_item_data = data
+                item_to_remove = item
+                break
 
-        pickup_item(status, items_list, new_x, new_y)
+        # 2. アイテムが見つかったかどうかで分岐
+        if target_item_data:
+            # --- アイテムが見つかった ---
+            
+            # 2a. 持ち物がいっぱいかチェック
+            if len(status["inventory"]) >= MAX_INVENTORY_SIZE:
+                # 満タンの場合：
+                # (君の要望) どのアイテムの上に乗ったかログを出す
+                add_log(f"持ち物がいっぱいで、{target_item_data['name']} の上に乗った。")
+                # 拾わずに、そのまま下の「移動した。」処理へ進む
+                pass
+            
+            else:
+                # 持ち物に空きがある場合：
+                # (pickup_item のロジックをここで実行)
+                status["inventory"].append(target_item_data)
+                items_list.remove(item_to_remove)
+                add_log(f"{target_item_data['name']} を拾った!")
+                # そのまま下の「移動した。」処理へ進む
+
+        else:
+            # --- アイテムが見つからなかった ---
+            # (これは「見えないアイテム」バグ)
+            add_log("（しかし、そこには何もなかった）")
+            # そのまま下の「移動した。」処理へ進む
+            pass
     
 
     #add_log("移動した。")
     # 1. 元の場所を床に戻す
-    tile_to_set = MAP_SYMBOLS["FLOOR"]
+    # 1. 元の場所をどうするか？
+    #    (元の場所にアイテムリストのアイテムがあるか？)
+    tile_to_set = MAP_SYMBOLS["FLOOR"] # 基本は床(.)
     for (item_x, item_y), _ in items_list:
         if (item_x, item_y) == (current_x, current_y):
-            tile_to_set = MAP_SYMBOLS["ITEM"]
-            break
+            # 満タンで踏んだアイテムが、ここ(元の場所)にあるはず
+            tile_to_set = MAP_SYMBOLS["ITEM"] 
+            break # ループ終了
     dungeon_map[current_y][current_x] = tile_to_set
 
     # 2. プレイヤーの位置を更新
@@ -136,6 +174,7 @@ MAX_ROOMS = 10
 MAX_ENEMIES_PER_ROOM = 1
 MAX_ITEM_PER_ROOM = 3
 SIGHT_RANGE = 8
+MAX_INVENTORY_SIZE = 10
 
 def create_empty_floor(width, height):
     # 全体が壁のからのフロア(二次元リスト)を作成する関数
@@ -544,31 +583,6 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
     dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
     return True
 
-def pickup_item(player_status, items_list, item_x, item_y):
-
-    target_item_data = None
-    item_to_remove = None
-
-    # 座標から、アイテムデータをitem_listから探す
-    for item in items_list:
-        coords, data = item
-        if coords == (item_x, item_y):
-            target_item_data = data
-            item_to_remove = item
-            break
-    
-    if target_item_data:
-        #プレイヤーのインベントリに追加
-        player_status["inventory"].append(target_item_data)
-
-        # items_list から削除
-        items_list.remove(item_to_remove)
-
-        # ログに追加
-        add_log(f"{target_item_data['name']} を拾った!")
-    else:
-        add_log("エラー：見えないアイテムを拾ったみたいだね、旅人さん")
-
 def get_menu_input():
     #メニュー用の入力を受け付ける
     move = input("使用するアイテムの番号(0, 1...)、捨てる(d)、 または 終了(x) を入力").lower()
@@ -639,34 +653,65 @@ def get_drop_input():
     return move
 
 def drop_item(dungeon_map, player_status, items_list, item_index):
-    #指定されたインデックスのアイテムを足元に捨てる関数
+    """
+    指定されたインデックスのアイテムを足元に置く関数
+    
+    - 足元にアイテムが「ない」場合は、そのまま置く (ドロップ)
+    - 足元にアイテムが「ある」場合は、足元のアイテムを拾ってから置く (スワップ)
+    """
+    
     inventory = player_status["inventory"]
-
-    #有効なインデックスかチェック
+    
+    # 1. 有効なインデックスかチェック
     if not (0 <= item_index < len(inventory)):
-        add_log("無は捨てれないよ")
+        add_log("その番号のアイテムは持っていない。")
         return False
-    
-    player_x, player_y = player_status["X"], player_status["Y"]
-    target_tile = dungeon_map[player_y][player_x]
 
-    if target_tile not in [MAP_SYMBOLS["FLOOR"], MAP_SYMBOLS["PLAYER"]]:
-        if target_tile == MAP_SYMBOLS["STAIRS"]:
-            add_log("階段の上にはアイテムを置けない")
-            return False
-        if target_tile == MAP_SYMBOLS["ITEM"]:
-            add_log("アイテムの上にはアイテムを置けない")
+    player_x, player_y = player_status["X"], player_status["Y"]
     
-    if dungeon_map[player_y][player_x] != MAP_SYMBOLS["PLAYER"]:
-        add_log("なぞのばしょにはアイテムを置けない")
-        return False
+    # 2. 足元にあるアイテムを探す (スワップ用)
+    item_on_floor_data = None
+    item_on_floor_to_remove = None # items_list から削除するための実体
     
+    for item in items_list:
+        coords, data = item
+        if coords == (player_x, player_y):
+            item_on_floor_data = data
+            item_on_floor_to_remove = item
+            break # アイテムを1つ見つけたら終了
+            
+    # 3. 捨てるアイテムを取得 (インベントリから先に削除)
     item_to_drop = inventory.pop(item_index)
 
-    items_list.append(((player_x, player_y), item_to_drop))
+    # 4. 足元にアイテムがあったか？ (スワップ処理)
+    if item_on_floor_data:
+        
+        # 4a. 足元のアイテムを items_list から削除
+        items_list.remove(item_on_floor_to_remove)
+        
+        # 4b. 足元のアイテムをインベントリに追加
+        # (注：10個の時に1個捨て(pop)てから1個拾うので、数は10個のまま。
+        inventory.append(item_on_floor_data)
+        
+        # 4c. 捨てたアイテムを items_list に追加 (足元に置く)
+        items_list.append(((player_x, player_y), item_to_drop))
+        
+        # 4d. マップの見た目は '!' のまま (変わらない)
+        
+        add_log(f"{item_on_floor_data['name']} を拾い、{item_to_drop['name']} を足元に置いた。")
 
-    add_log(f"{item_to_drop['name']} を足元に捨てた。")
-    return True
+    else:
+        # 5. 足元に何もなかった場合 (通常のドロップ)
+        
+        # 5a. 捨てたアイテムを items_list に追加 (足元に置く)
+        items_list.append(((player_x, player_y), item_to_drop))
+        
+        # 5b. マップの見た目を '!' に変更
+        dungeon_map[player_y][player_x] = MAP_SYMBOLS["ITEM"]
+        
+        add_log(f"{item_to_drop['name']} を足元に捨てた。")
+
+    return True # ターン消費
 
 def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
     #捨てる入力に応じた処理を呼び出す関数
@@ -772,6 +817,11 @@ def equip_item(player_status, item_index):
     
     # 装備の交換処理
     current_equipment = player_status["Equipment"].get(equip_slot)
+
+    if current_equipment:
+        if len(player_status["inventory"]) >= MAX_INVENTORY_SIZE:
+            add_log(f"持ち物がいっぱいで {current_equipment('name')} を外せない!")
+            return False
 
     player_status["Equipment"][equip_slot] = item_to_equip
 
