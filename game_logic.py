@@ -304,8 +304,8 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
         return
     
     # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
-    # (game_data.py の Atk, Def を使うぞ)
-    damage = max(0, player_status["Atk"] - target_enemy["Def"])
+    player_atk = get_total_atk(player_status)
+    damage = max(0, player_atk - target_enemy["Def"])
     enemy_pos = (target_enemy["X"], target_enemy["Y"])
 
     if damage > 0:
@@ -381,7 +381,8 @@ def enemy_attack_player(enemy, player_status):
     #敵がプレイヤーを攻撃する関数
 
     #ダメージ計算はアルテリオス
-    damage = max(0, enemy["Atk"] - player_status["Def"])
+    player_def = get_total_def(player_status)
+    damage = max(0, enemy["Atk"] - player_def)
     enemy_pos = (enemy['X'], enemy['Y'])
 
     if damage > 0:
@@ -523,6 +524,28 @@ def use_item(player_status, item_index):
     else:
         add_log(f"{item_to_use['name']} は今使えない。")
         return False
+    
+def get_total_atk(player_status):
+    # 素のAtkと装備品のAtkボーナスを合計した値を返す
+    base_atk = player_status["Atk"]
+    weapon = player_status["Equipment"].get("weapon")
+
+    if weapon:
+        # 武器を装備していれば、ボーナスを加算
+        base_atk += weapon.get("atk_bonus", 0)
+
+    return base_atk
+
+def get_total_def(player_status):
+    # 素のDefと装備品のDefボーナスを合計した値を返す
+    base_def = player_status["Def"]
+    shield = player_status["Equipment"].get("shield")
+
+    if shield:
+        # 盾を装備していれば、ボーナスを加算
+        base_def += shield.get("def_bonus", 0)
+    
+    return base_def
 
 def gain_experience(player_status, exp_amount):
     
