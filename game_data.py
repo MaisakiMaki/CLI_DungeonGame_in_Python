@@ -3,7 +3,7 @@ game_state = "playing"
 
 player_status = {
     "Lv": 1,
-    "HP": 20,
+    "HP": 10,
     "Max_HP": 20,
     "Atk": 5,
     "Def": 3,
@@ -16,6 +16,8 @@ player_status = {
         "weapon": None,
         "shield": None
     },
+
+    "turn_counter_for_hunger": 0,
     # 現在の座標のX座標
     "X": 2,
     # 現在の座標のY座標

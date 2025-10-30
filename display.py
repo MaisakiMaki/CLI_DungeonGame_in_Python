@@ -20,7 +20,7 @@ def draw_status(status):
     total_def = get_total_def(status)
 
     print("-" * 30)
-    print(f"< Lv:{status['Lv']} HP:{status['HP']}/{status['Max_HP']} 空腹度:{status['Hung']}/{status['Max_Hung']}")
+    print(f"< Lv:{status['Lv']} HP:{status['HP']}/{status['Max_HP']} 満腹度:{status['Hung']}/{status['Max_Hung']}")
     print(f"< Atk:{total_atk} Def:{total_def}")
     print("-" * 30)
 

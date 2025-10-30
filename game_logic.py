@@ -87,17 +87,24 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
 
 def consume_hunger(status):
     # 空腹度を計算する関数
-
-    # 特定の歩数ごとに1消費するということロジックを後にかく
-    # カウンタなどを使って実装予定、今は毎ターン消費
-    status['Hung'] = max(0, status['Hung'] - 1)
-
-    if status['Hung'] == 0:
-        add_log("空腹で倒れそうだ...")
-        # HP減少ロジックなどを追加
+    if status['Hung'] > 0:
+        if status["HP"] < status["Max_HP"]:
+            status["HP"] += 1
+    else:
         status['HP'] -= 1
-    
+        
+    status["turn_counter_for_hunger"] += 1
 
+    if status["turn_counter_for_hunger"] >= 10:
+        status['Hung'] = max(0, status['Hung'] - 1)
+        if status['Hung'] == 50:
+            add_log("少しお腹が空いてきた")
+        elif status['Hung'] == 20:
+            add_log("かなりお腹が空いてきた")
+        elif status['Hung'] == 0:
+            add_log("空腹で倒れそうだ...")
+        status["turn_counter_for_hunger"] = 0
+    
 def handle_input(dungeon_map, status, enemies_list, items_list, move):
     #入力に応じた処理を呼び出す関数
 
