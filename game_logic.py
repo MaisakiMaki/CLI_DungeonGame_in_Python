@@ -65,7 +65,7 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
         pickup_item(status, items_list, new_x, new_y)
     
 
-    add_log("移動した。")
+    #add_log("移動した。")
     # 1. 元の場所を床に戻す
     tile_to_set = MAP_SYMBOLS["FLOOR"]
     for (item_x, item_y), _ in items_list:
@@ -135,6 +135,7 @@ FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
 MAX_ENEMIES_PER_ROOM = 1
 MAX_ITEM_PER_ROOM = 3
+SIGHT_RANGE = 8
 
 def create_empty_floor(width, height):
     # 全体が壁のからのフロア(二次元リスト)を作成する関数
@@ -402,36 +403,54 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
 
 def enemy_turn(dungeon_map, player_status, enemies_list):
     #すべての敵の行動処理を行う関数
-
-    #add_log("--- 敵のターン ---")
     if not enemies_list:
-        #add_log("敵は誰もいなかった")
         return
     
     player_x, player_y = player_status["X"], player_status["Y"]
     
     #敵が複数いてもいいようにリストをコピーして処理する
     for enemy in enemies_list[:]:
-
-        #敵がリストがら削除されているか確認
         if enemy not in enemies_list:
             continue
 
         enemy_x, enemy_y = enemy["X"], enemy["Y"]
+        
+        # --- 修正点：索敵と移動方向の決定 ---
 
-        # --- 索敵と移動アルゴリズム ---
+        # 1. プレイヤーとの距離を計算 (マンハッタン距離)
+        distance = abs(player_x - enemy_x) + abs(player_y - enemy_y)
+        
+        move_x = 0
+        move_y = 0
 
-        move_x = 1 if player_x > enemy_x else -1 if player_x < enemy_x else 0
-        move_y = 1 if player_y > enemy_y else -1 if player_y < enemy_y else 0
+        if distance <= SIGHT_RANGE:
+            # 索敵範囲内：プレイヤーを追跡 (今までのロジック)
+            # (プレイヤーの方向へ進む)
+            move_x = 1 if player_x > enemy_x else -1 if player_x < enemy_x else 0
+            move_y = 1 if player_y > enemy_y else -1 if player_y < enemy_y else 0
+        
+        else:
+            # 索敵範囲外：ランダムウォーク
+            # (上下左右 + 停止 の5択からランダムに選ぶ)
+            possible_moves = [(0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
+            move_x, move_y = random.choice(possible_moves)
 
+        # --- 修正点：ここまで ---
+        
+        # --- 移動試行 (ここからは元のロジックをそのまま使う) ---
+        
+        # 2. 優先方向を決定
+        # (索敵範囲外のランダムウォークでも、この優先ロジックは
+        #  X(例:0)とY(例:1)のどちらを先に試すかを決めるだけなので、問題なく機能する)
         if abs(player_x - enemy_x) >= abs(player_y - enemy_y):
-            #Xを優先
+            # Xを優先
 
-            # Xを試す
+            # 2-1. X方向を試す
             new_x, new_y = enemy_x + move_x, enemy_y
             if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
-                continue
+                continue # 行動成功
             
+            # 2-2. XがダメならY方向を試す
             new_x, new_y = enemy_x, enemy_y + move_y
             if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
                 continue # 行動成功
@@ -447,9 +466,9 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
             new_x, new_y = enemy_x + move_x, enemy_y
             if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
                 continue # 行動成功
-
-        #add_log(f"敵({enemy['X']}, {enemy['Y']})はまごまごしている")
-
+        
+        # どの方向にも動けなかった場合 (袋小路 or 停止を選んだ)
+        # (何もしない)
 
         
 
@@ -480,28 +499,50 @@ def enemy_attack_player(enemy, player_status):
         add_log(f"敵{enemy_pos}の攻撃をかわした!")
 
 def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+    """
+    敵が (new_x, new_y) へ移動または攻撃を試みる関数
+    Ver.4 (アイテム/階段の上もOK)
+    """
 
-    # 0. 移動先が何もないなら失敗
+    # 0. 移動先が現在地と同じなら失敗
     if new_x == enemy["X"] and new_y == enemy["Y"]:
         return False
     
-    # 1. 移動先はプレイヤー？
-    if dungeon_map[new_y][new_x] == MAP_SYMBOLS["PLAYER"]:
+    # 1. 移動先がマップ範囲外かチェック
+    if not (0 <= new_y < FLOOR_HEIGHT and 0 <= new_x < FLOOR_WIDTH):
+        return False
+        
+    target_tile = dungeon_map[new_y][new_x]
+    
+    # 2. 移動先はプレイヤー？
+    if target_tile == MAP_SYMBOLS["PLAYER"]:
         enemy_attack_player(enemy, player_status)
         return True
     
-    # 2. 移動先は有効な床か？
-    if is_valid_move(dungeon_map, new_x, new_y) and \
-       dungeon_map[new_y][new_x] != MAP_SYMBOLS["ENEMY"]:
-        
-        #移動を実行
-        dungeon_map[enemy["Y"]][enemy["X"]] = enemy["standing_on"]
-        enemy["standing_on"] = dungeon_map[new_y][new_x]
-        enemy["X"], enemy["Y"] = new_x, new_y
-        dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
-        return True
+    # --- 修正点：ここから ---
     
-    return False
+    # 3. 移動先は「壁」または「他の敵」か？
+    #    (この2つ "以外" なら、移動できる)
+    if target_tile in [MAP_SYMBOLS["WALL"], MAP_SYMBOLS["ENEMY"]]:
+        return False # 移動失敗
+        
+    # --- 修正点：ここまで ---
+
+    # 4. 移動実行
+    #    (移動先は 床, アイテム, 階段 のいずれか)
+    
+    # 元いた場所を、隠していたタイル(床, アイテム, 階段)に戻す
+    dungeon_map[enemy["Y"]][enemy["X"]] = enemy["standing_on"]
+    
+    # 新しい場所のタイル(床, アイテム, 階段)を 'standing_on' に保存
+    enemy["standing_on"] = target_tile 
+    
+    # 座標を更新
+    enemy["X"], enemy["Y"] = new_x, new_y
+    
+    # マップに 'E' を書き込む
+    dungeon_map[new_y][new_x] = MAP_SYMBOLS["ENEMY"]
+    return True
 
 def pickup_item(player_status, items_list, item_x, item_y):
 
