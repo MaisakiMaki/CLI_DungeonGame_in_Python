@@ -357,13 +357,19 @@ def place_items(dungeon_map, room, items_list, current_floor):
                 # 1. アイテムのマスターテーブル (確率は「重み」として使う)
                 # (重み, 最小階層, 最大階層, アイテムデータ)
                 item_table = [
-                    # RARE (10F+)
-                    (10, 10, 99, {"name": "鋼の剣", "type": "weapon", "atk_bonus": 8, "def_bonus": 0}),
-                    (10, 10, 99, {"name": "鋼の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 8}),
+                    # LEGEND (25F+)
+                    (5, 25, 99, {"name": "オリハルコンの剣", "type": "weapon", "atk_bonus": 15, "def_bonus": 3}),
+                    (5, 25, 99, {"name": "戦女神の盾", "type": "shield", "atk_bonus": 3, "def_bonus": 15}),
+                    # EPIC (15F+)
+                    (10, 15, 99, {"name": "ミスリルの剣", "type": "weapon", "atk_bonus": 12, "def_bonus": 0}),
+                    (10, 15, 99, {"name": "ミスリルの盾", "type": "shield", "atk_bonus": 0, "def_bonus": 12}),
+                    # RARE (10F - 20F)
+                    (10, 10, 19, {"name": "鋼の剣", "type": "weapon", "atk_bonus": 8, "def_bonus": 0}),
+                    (10, 10, 19, {"name": "鋼の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 8}),
                     
                     # UNCOMMON (5F-15F)
-                    (15, 5, 15, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
-                    (15, 5, 15, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
+                    (15, 5, 14, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
+                    (15, 5, 14, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
                     
                     # COMMON (1F-7F)
                     (20, 1, 7, {"name": "こん棒", "type": "weapon", "atk_bonus": 2, "def_bonus": 0}),
@@ -373,6 +379,8 @@ def place_items(dungeon_map, room, items_list, current_floor):
                     # (重みを少し増やしておきましたぞ)
                     (35, 1, 99, {"name": "おにぎり", "type": "food", "effect": 50}),
                     (45, 1, 99, {"name": "薬草", "type": "potion", "effect": 10}),
+                    (20, 10, 99, {"name": "大きなおにぎり", "type": "food", "effect": 100}),
+                    (30, 10, 99, {"name": "上薬草", "type": "potion", "effect": 25}),
                 ]
 
                 # 2. この階層で「出現候補」になるアイテムリストを作る
@@ -497,24 +505,24 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
 
             # 2-1. X方向を試す
             new_x, new_y = enemy_x + move_x, enemy_y
-            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
                 continue # 行動成功
             
             # 2-2. XがダメならY方向を試す
             new_x, new_y = enemy_x, enemy_y + move_y
-            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
                 continue # 行動成功
         else:
             # Y方向を優先
             
             # 2-1. Y方向を試す
             new_x, new_y = enemy_x, enemy_y + move_y
-            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
                 continue # 行動成功
 
             # 2-2. YがダメならX方向を試す
             new_x, new_y = enemy_x + move_x, enemy_y
-            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+            if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
                 continue # 行動成功
         
         # どの方向にも動けなかった場合 (袋小路 or 停止を選んだ)
@@ -548,10 +556,9 @@ def enemy_attack_player(enemy, player_status):
     else:
         add_log(f"敵{enemy_pos}の攻撃をかわした!")
 
-def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
+def try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
     """
     敵が (new_x, new_y) へ移動または攻撃を試みる関数
-    Ver.5 (手術完了版)
     """
 
     # 0. 移動先が現在地と同じなら失敗
@@ -571,7 +578,7 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
         return False # 壁には移動しない
         
     # 3. 移動先は「他の敵」か？ (enemies_list をチェック)
-    for other_enemy in game_data.enemies_list: # (game_data.enemies_list を参照)
+    for other_enemy in enemies_list: # (game_data.enemies_list を参照)
         if other_enemy is not enemy and \
            other_enemy["X"] == new_x and other_enemy["Y"] == new_y:
             return False # 他の敵の上には移動しない

@@ -49,4 +49,10 @@ LEVEL_UP_TABLE ={
     2: {"Max_HP_Up": 5, "Atk_Up": 2, "Def_Up": 1, "Next_Exp": 25},
     3: {"Max_HP_Up": 5, "Atk_Up": 2, "Def_Up": 2, "Next_Exp": 50},
     4: {"Max_HP_Up": 6, "Atk_Up": 3, "Def_Up": 1, "Next_Exp": 100},
+    5: {"Max_HP_Up": 6, "Atk_Up": 3, "Def_Up": 2, "Next_Exp": 150},
+    6: {"Max_HP_Up": 5, "Atk_Up": 4, "Def_Up": 1, "Next_Exp": 220},
+    7: {"Max_HP_Up": 4, "Atk_Up": 1, "Def_Up": 1, "Next_Exp": 300},
+    8: {"Max_HP_Up": 5, "Atk_Up": 2, "Def_Up": 2, "Next_Exp": 400},
+    9: {"Max_HP_Up": 5, "Atk_Up": 3, "Def_Up": 1, "Next_Exp": 500},
+    10: {"Max_HP_Up": 10, "Atk_Up": 5, "Def_Up": 3, "Next_Exp": 0}
 }
