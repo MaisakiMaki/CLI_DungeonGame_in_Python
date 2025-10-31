@@ -11,20 +11,17 @@ def add_log(message):
 
 def get_movement_input(stdscr):
     # curses でプレイヤーの入力を受け付ける
+    stdscr.addstr(25, 0, "移動方向 (w/a/s/d)、メニュー(c)、終了(q)を入力      ")
     
-    # (y, x) 座標を指定してプロンプトを描画
-    # (ひとまず、マップの下 (23行目)あたりに描画しときますかな)
-    stdscr.addstr(23, 0, "移動方向 (w/a/s/d)、メニュー(c)、終了(q)を入力      ")
+    key_code = stdscr.getch()
+    move = ' ' # デフォルト値
     
-    key_code = stdscr.getch() # キー入力を待つ
-    
-    # curses の getch() は、キーコード(数字)か、
-    # .decode() して文字(str)にする必要がある
     try:
         move = chr(key_code)
     except Exception:
-        move = ' ' # エラー時は、とりあえず ' ' (何もしない) にしておく
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
         
+    # --- 修正点：return を try/except の「外」に出す ---
     return move.lower()
 
 def is_valid_move(dungeon_map, target_x, target_y):
@@ -36,7 +33,7 @@ def is_valid_move(dungeon_map, target_x, target_y):
     
     # 移動先が壁じゃないかをチェックする
     if dungeon_map[target_y][target_x] == MAP_SYMBOLS["WALL"]:
-        print("壁に阻まれた...")
+        add_log("壁に阻まれた...")
         return False
     
     # あとでアイテムなどの追加
@@ -58,7 +55,7 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
             
     if target_enemy:
         # 敵がいた -> 攻撃
-        add_log("敵に攻撃!") # (print を add_log に修正)
+        add_log("敵に攻撃!")
         combat(dungeon_map, status, enemies_list, new_x, new_y)
         consume_hunger(status)
         return True # 行動終了 (移動しない)
@@ -580,14 +577,17 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
 
 def get_menu_input(stdscr):
     # curses でメニュー用の入力を受け付ける
-    stdscr.addstr(23, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
+    stdscr.addstr(25, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
     
     key_code = stdscr.getch()
+    move = ' ' # デフォルト値
+    
     try:
         move = chr(key_code)
     except Exception:
-        move = ' ' 
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
         
+    # --- 修正点：return を try/except の「外」に出す ---
     return move.lower()
 
 def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
@@ -643,6 +643,7 @@ def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
             # アイテム使用失敗(満タンなど)または装備失敗
             # (ログは各関数内で出ているはず)
             pass
+        return True
             
     elif action == "q":
         return False # ゲーム終了
@@ -651,13 +652,18 @@ def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
 
 def get_drop_input(stdscr):
     # curses で捨てるアイテム用の入力を受け付ける
-    stdscr.addstr(23, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
+    stdscr.addstr(25, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
     
     key_code = stdscr.getch()
+    move = ' ' # デフォルト値
+    
     try:
         move = chr(key_code)
     except Exception:
-        move = ' '
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
+        
+    # --- 修正点：return を try/except の「外」に出す ---
+    return move.lower()
 
 def drop_item(dungeon_map, player_status, items_list, item_index):
     """
@@ -737,6 +743,8 @@ def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
             enemy_turn(dungeon_map, status, game_data.enemies_list)
         else:
             pass
+        
+        return True
     
     elif action == "q":
         return False
