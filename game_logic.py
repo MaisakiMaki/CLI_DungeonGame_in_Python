@@ -149,7 +149,7 @@ FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
 MAX_ROOMS = 10
 MAX_ROOMS_TRIES = 50
-MAX_ENEMIES_PER_ROOM = 1
+MAX_ENEMIES_PER_ROOM = 2
 MAX_ITEM_PER_ROOM = 2
 SIGHT_RANGE = 8
 MAX_INVENTORY_SIZE = 10
@@ -188,19 +188,27 @@ def connect_rooms(dungeon_map, start_point, end_point):
             dungeon_map[y][x2] = MAP_SYMBOLS["FLOOR"]
 
 def check_room_overlap(new_room_coords, existing_rooms):
-    # 新しい部屋の座標が、既存の部屋のリストと重なって開花をチェックする関数
-    # (x1, y1, w1, h1)は新た強い部屋の座標とサイズ
-
+    """
+    新しい部屋の座標が、既存の部屋リストと重なっていないかチェックする関数
+    (x1, y1, w1, h1) は新しい部屋の座標とサイズ
+    """
     x1, y1, w1, h1 = new_room_coords
-
-    #既存の各部屋(room)と重なりをチェック
+    
+    # 既存の各部屋(room)と重なりをチェック
     for room in existing_rooms:
         x2, y2, w2, h2 = room['x'], room['y'], room['w'], room['h']
-        if (x1 < x2 + w2 + 1 and x1 + w1 + 1 < x2 and
-            y1 < y2 + h2 + 1 and y1 + h1 + 1 > y2):
-            return True
         
-    return False
+        # AABB 衝突判定ロジック
+        # (わしは、部屋同士が壁1枚で隣接するのも防ぐため、
+        #  判定に「+1」のマージン（余白）を持たせておる)
+        
+        # --- 修正点： < を > に変更 ---
+        if (x1 < x2 + w2 + 1 and x1 + w1 + 1 > x2 and
+            y1 < y2 + h2 + 1 and y1 + h1 + 1 > y2):
+        # --- 修正点：ここまで ---
+            return True # 重なっている
+            
+    return False # 重なっていない
 
 def generate_dungeon(status):
     # ダンジョンマップ全体を生成するメイン関数 敵リストも追加
