@@ -16,8 +16,13 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
         refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state)
 
         # 3. ゲームの状態によって処理を分岐
+        if game_data.game_state == "tutorial":
+            # チュートリアル画面では、Enterキーだけを待つ
+            key_code = stdscr.getch()
+            if key_code == curses.KEY_ENTER or key_code == 10:
+                game_data.game_state = "playing" # ゲーム開始
         
-        if game_data.game_state == "playing":
+        elif game_data.game_state == "playing":
             action = get_movement_input(stdscr) # (get_... は stdscr が必要)
             is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
         

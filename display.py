@@ -46,7 +46,7 @@ def draw_status(stdscr, status):
     stdscr.addstr(22, 0, "-" * 30)
     stdscr.addstr(23, 0, f"< Lv:{status['Lv']} HP:{status['HP']}/{status['Max_HP']} 満腹度:{status['Hung']}/{status['Max_Hung']}")
     # (プロンプトと被らないよう、プロンプトは y=23 にした)
-    # stdscr.addstr(23, 0, f"< Atk:{total_atk} Def:{total_def}")
+    stdscr.addstr(24, 0, f"< Atk:{total_atk} Def:{total_def}")
     # stdscr.addstr(24, 0, "-" * 30)
 
 def draw_log(stdscr, log_list):
@@ -80,6 +80,22 @@ def draw_menu(stdscr, inventory, Equipment):
             if i >= 10: break 
             stdscr.addstr(i + 8, 4, f"{i}: {item['name']}")
 
+def draw_tutorial_screen(stdscr):
+    """チュートリアル画面を描画する関数"""
+    stdscr.addstr(3, 5, "ようこそ、鳳の間に。")
+    
+    stdscr.addstr(6, 7, "--- 操作方法 ---")
+    stdscr.addstr(8, 7, "w, a, s, d : 移動")
+    stdscr.addstr(9, 7, "c           : メニュー (アイテム使用 / 装備)")
+    stdscr.addstr(10, 7, "q           : ゲーム終了")
+    
+    stdscr.addstr(12, 7, "@ : あなた")
+    stdscr.addstr(13, 7, "E : 敵")
+    stdscr.addstr(14, 7, "! : アイテム")
+    stdscr.addstr(15, 7, "< : 階段")
+    
+    stdscr.addstr(20, 5, "【Enterキー】を押してゲームを開始します...")
+
 def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state):
     # 画面全体を更新する関数
     
@@ -88,22 +104,19 @@ def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_l
     
     try:
         # --- 修正点：ここから ---
-        if game_state == "menu" or game_state == "drop_menu":
-            # 2a. 「メニュー画面」を描画
-            # (マップ、ステータス、ログは描画しない)
+        if game_state == "tutorial":
+            # 2a. 「チュートリアル画面」を描画
+            draw_tutorial_screen(stdscr)
+            
+        elif game_state == "menu" or game_state == "drop_menu":
+            # 2b. 「メニュー画面」を描画
             draw_menu(stdscr, status["inventory"], status["Equipment"])
             
-            # (この後、game_logic.py の get_menu_input が
-            #  y=25 にプロンプトを描画する)
-            
-        else: # (game_state == "playing" などの場合)
-            # 2b. 「通常のゲーム画面」を描画
+        else: 
+            # 2c. 「通常のゲーム画面」を描画
             draw_map(stdscr, dungeon_map, status, enemies_list, items_list)
             draw_status(stdscr, status)
             draw_log(stdscr, game_log)
-            
-            # (この後、game_logic.py の get_movement_input が
-            #  y=25 にプロンプトを描画する)
         # --- 修正点：ここまで ---
 
     except curses.error:

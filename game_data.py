@@ -1,5 +1,5 @@
-#ゲームの現在の状態 ("playing", "menu", "next_floor")
-game_state = "playing"
+#ゲームの現在の状態 ("playing", "menu", "next_floor", "tutorial", "game_over")
+game_state = "tutorial"
 
 player_status = {
     "Lv": 1,
