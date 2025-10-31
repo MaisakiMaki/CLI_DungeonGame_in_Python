@@ -11,7 +11,7 @@ def add_log(message):
 
 def get_movement_input(stdscr):
     # curses でプレイヤーの入力を受け付ける
-    stdscr.addstr(25, 0, "移動方向 (w/a/s/d)、メニュー(c)、終了(q)を入力      ")
+    stdscr.addstr(25, 0, "移動(wasd)、メニュー(c)、ヘルプ(h)、終了(q)を入力      ")
     
     key_code = stdscr.getch()
     move = ' ' # デフォルト値
@@ -139,6 +139,10 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
         add_log("メニューを開いた")
         game_data.game_state = "menu"
         moved = False
+    elif move == "h": # ヘルプ表示
+        add_log("ヘルプを開いた。")
+        game_data.game_state = "tutorial" # チュートリアルステートに変更
+        moved = False # ターンは消費しない
     
     if moved:
         enemy_turn(dungeon_map, status, enemies_list)
