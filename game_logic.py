@@ -1,3 +1,4 @@
+import curses
 import random
 import game_data
 from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE
@@ -8,10 +9,23 @@ def add_log(message):
     if len(game_log) > 50:
         game_log.pop
 
-def get_movement_input():
-    #プレイヤーの入力を受け付ける関数
-    move = input("移動方向 (w/a/s/d)、またはメニュー(c)、終了(q)を入力").lower()
-    return move
+def get_movement_input(stdscr):
+    # curses でプレイヤーの入力を受け付ける
+    
+    # (y, x) 座標を指定してプロンプトを描画
+    # (ひとまず、マップの下 (23行目)あたりに描画しときますかな)
+    stdscr.addstr(23, 0, "移動方向 (w/a/s/d)、メニュー(c)、終了(q)を入力      ")
+    
+    key_code = stdscr.getch() # キー入力を待つ
+    
+    # curses の getch() は、キーコード(数字)か、
+    # .decode() して文字(str)にする必要がある
+    try:
+        move = chr(key_code)
+    except Exception:
+        move = ' ' # エラー時は、とりあえず ' ' (何もしない) にしておく
+        
+    return move.lower()
 
 def is_valid_move(dungeon_map, target_x, target_y):
     # 移動先が壁じゃないかを確認する関数
@@ -564,10 +578,17 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, new_x, new_y):
     
     return True
 
-def get_menu_input():
-    #メニュー用の入力を受け付ける
-    move = input("使用するアイテムの番号(0, 1...)、捨てる(d)、 または 終了(x) を入力").lower()
-    return move
+def get_menu_input(stdscr):
+    # curses でメニュー用の入力を受け付ける
+    stdscr.addstr(23, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
+    
+    key_code = stdscr.getch()
+    try:
+        move = chr(key_code)
+    except Exception:
+        move = ' ' 
+        
+    return move.lower()
 
 def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
     #メニュー入力に応じた処理を呼び出す関数
@@ -628,10 +649,15 @@ def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
     
     return True # ゲーム続行
 
-def get_drop_input():
-    #捨てるアイテム用の入力
-    move = input("捨てるアイテムの番号(0, 1...) または 終了(x) を入力").lower()
-    return move
+def get_drop_input(stdscr):
+    # curses で捨てるアイテム用の入力を受け付ける
+    stdscr.addstr(23, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
+    
+    key_code = stdscr.getch()
+    try:
+        move = chr(key_code)
+    except Exception:
+        move = ' '
 
 def drop_item(dungeon_map, player_status, items_list, item_index):
     """
