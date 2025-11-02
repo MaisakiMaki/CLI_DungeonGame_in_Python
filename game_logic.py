@@ -1,7 +1,7 @@
 import curses
 import random
 import game_data
-from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE
+from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE, ITEM_TABLE, ENEMY_TABLE
 import threading
 try:
     from playsound import playsound
@@ -330,28 +330,11 @@ def place_enemies(dungeon_map, room, enemies_list, current_floor):
 
     # 1. 敵のマスターテーブルを定義
     # (重み, 最小階層, 最大階層, {敵のテンプレート辞書})
-    enemy_table = [
-        # (スライム: 1-5階)
-        (50, 1, 5, {
-            "name": "スライム", "symbol": "S",
-            "base_HP": 5, "base_Atk": 3, "base_Def": 1, "base_Exp": 2
-        }),
-        # (ゴブリン: 3-10階)
-        (30, 3, 10, {
-            "name": "ゴブリン", "symbol": "G",
-            "base_HP": 8, "base_Atk": 5, "base_Def": 2, "base_Exp": 5
-        }),
-        # (オーク: 8-15階)
-        (20, 8, 15, {
-            "name": "オーク", "symbol": "O",
-            "base_HP": 15, "base_Atk": 8, "base_Def": 4, "base_Exp": 10
-        }),
-    ]
 
     # 2. この階層で「出現候補」になる敵リストを作る
     available_enemies = []
     total_weight = 0
-    for (prob, min_floor, max_floor, template) in enemy_table:
+    for (prob, min_floor, max_floor, template) in ENEMY_TABLE:
         if min_floor <= current_floor <= max_floor:
             available_enemies.append((prob, template))
             total_weight += prob # 重みを合計
@@ -433,37 +416,11 @@ def place_items(dungeon_map, room, items_list, current_floor):
                 
                 # 1. アイテムのマスターテーブル (確率は「重み」として使う)
                 # (重み, 最小階層, 最大階層, アイテムデータ)
-                item_table = [
-                    # LEGEND (25F+)
-                    (5, 25, 99, {"name": "オリハルコンの剣", "type": "weapon", "atk_bonus": 15, "def_bonus": 3}),
-                    (5, 25, 99, {"name": "戦女神の盾", "type": "shield", "atk_bonus": 3, "def_bonus": 15}),
-                    # EPIC (15F+)
-                    (10, 15, 99, {"name": "ミスリルの剣", "type": "weapon", "atk_bonus": 12, "def_bonus": 0}),
-                    (10, 15, 99, {"name": "ミスリルの盾", "type": "shield", "atk_bonus": 0, "def_bonus": 12}),
-                    # RARE (10F - 20F)
-                    (10, 10, 19, {"name": "鋼の剣", "type": "weapon", "atk_bonus": 8, "def_bonus": 0}),
-                    (10, 10, 19, {"name": "鋼の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 8}),
-                    
-                    # UNCOMMON (5F-15F)
-                    (15, 5, 14, {"name": "鉄の剣", "type": "weapon", "atk_bonus": 5, "def_bonus": 0}),
-                    (15, 5, 14, {"name": "鉄の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 5}),
-                    
-                    # COMMON (1F-7F)
-                    (20, 1, 7, {"name": "こん棒", "type": "weapon", "atk_bonus": 2, "def_bonus": 0}),
-                    (20, 1, 7, {"name": "木の盾", "type": "shield", "atk_bonus": 0, "def_bonus": 2}),
-                    
-                    # CONSUMABLES (Always)
-                    # (重みを少し増やしておきましたぞ)
-                    (35, 1, 99, {"name": "おにぎり", "type": "food", "effect": 50}),
-                    (45, 1, 99, {"name": "薬草", "type": "potion", "effect": 10}),
-                    (20, 10, 99, {"name": "大きなおにぎり", "type": "food", "effect": 100}),
-                    (30, 10, 99, {"name": "上薬草", "type": "potion", "effect": 25}),
-                ]
 
                 # 2. この階層で「出現候補」になるアイテムリストを作る
                 available_items = []
                 total_weight = 0
-                for (prob, min_floor, max_floor, item_data) in item_table:
+                for (prob, min_floor, max_floor, item_data) in ITEM_TABLE:
                     if min_floor <= current_floor <= max_floor:
                         available_items.append((prob, item_data))
                         total_weight += prob # 重みを合計
