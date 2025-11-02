@@ -324,42 +324,86 @@ def generate_dungeon(status):
 def place_enemies(dungeon_map, room, enemies_list, current_floor):
     # 部屋の中にランダムに敵を配置する関数
 
-    # この部屋に何体の敵を置くか決める
     num_enemies = random.randint(0, MAX_ENEMIES_PER_ROOM)
 
+    # --- 修正点：ここから ---
+
+    # 1. 敵のマスターテーブルを定義
+    # (重み, 最小階層, 最大階層, {敵のテンプレート辞書})
+    enemy_table = [
+        # (スライム: 1-5階)
+        (50, 1, 5, {
+            "name": "スライム", "symbol": "S",
+            "base_HP": 5, "base_Atk": 3, "base_Def": 1, "base_Exp": 2
+        }),
+        # (ゴブリン: 3-10階)
+        (30, 3, 10, {
+            "name": "ゴブリン", "symbol": "G",
+            "base_HP": 8, "base_Atk": 5, "base_Def": 2, "base_Exp": 5
+        }),
+        # (オーク: 8-15階)
+        (20, 8, 15, {
+            "name": "オーク", "symbol": "O",
+            "base_HP": 15, "base_Atk": 8, "base_Def": 4, "base_Exp": 10
+        }),
+    ]
+
+    # 2. この階層で「出現候補」になる敵リストを作る
+    available_enemies = []
+    total_weight = 0
+    for (prob, min_floor, max_floor, template) in enemy_table:
+        if min_floor <= current_floor <= max_floor:
+            available_enemies.append((prob, template))
+            total_weight += prob # 重みを合計
+
+    if total_weight == 0:
+        return # この階層に出る敵がいない
+
+    # --- 修正点：ここまで ---
+
     for _ in range(num_enemies):
-        # 敵を置ける床(.)を探す
-        # 100回試行して、ランダムな床(.)を見つける
         for _ in range(100):
             enemy_x = random.randint(room['x'], room['x'] + room["w"] - 1)
             enemy_y = random.randint(room['y'], room['y'] + room['h'] - 1)
 
-            # その場所が床(.)なら、敵を配置する
             if dungeon_map[enemy_y][enemy_x] == MAP_SYMBOLS["FLOOR"]:
+                
+                # --- 修正点：ここから ---
 
-                # 1. 敵のステータスを辞書で定義
-                #    (今は仮)
-                base_hp = 5 + (current_floor * 2)
-                base_atk = 3 + (current_floor // 2)
-                base_def = 1 + (current_floor // 3)
-                base_exp = 5 + current_floor
+                # 3. 候補リストから、重みに応じて1体選ぶ
+                enemy_template = None
+                if total_weight > 0:
+                    item_roll = random.randint(1, total_weight)
+                    cumulative_prob = 0
+                    for (prob, template) in available_enemies:
+                        cumulative_prob += prob
+                        if item_roll <= cumulative_prob:
+                            enemy_template = template.copy()
+                            break
+                
+                if enemy_template is None:
+                    continue # 念のため
+
+                # 4. 階層ボーナスを加算して、最終ステータスを決定
+                # (例: 階層が2上がるごとに Atk+1)
+                floor_bonus_atk = current_floor // 2
+                floor_bonus_def = current_floor // 3
+                floor_bonus_hp = current_floor * 1
 
                 new_enemy = {
-                    "HP": base_hp,
-                    "Atk": base_atk,
-                    "Def": base_def,
-                    "Exp": base_exp,
+                    "name": enemy_template["name"],
+                    "symbol": enemy_template["symbol"],
+                    "HP": enemy_template["base_HP"] + floor_bonus_hp,
+                    "Atk": enemy_template["base_Atk"] + floor_bonus_atk,
+                    "Def": enemy_template["base_Def"] + floor_bonus_def,
+                    "Exp": enemy_template["base_Exp"] + current_floor,
                     "X": enemy_x,
                     "Y": enemy_y,
                     "standing_on": MAP_SYMBOLS["FLOOR"]
                 }
+                # --- 修正点：ここまで ---
 
-                # 2. 敵リストに追加
                 enemies_list.append(new_enemy)
-
-                # 3. マップに 'E' を書き込む
-
-                # 1体配置したら次の敵へ
                 break
 
 def place_items(dungeon_map, room, items_list, current_floor):
@@ -481,18 +525,18 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     else:
         variance = random.uniform(0.9, 1.1)
         damage = round(base_damage * variance)
-    
-    enemy_pos = (target_enemy["X"], target_enemy["Y"])
 
+    enemy_name = target_enemy.get("name", "敵") # .get() で安全に名前取得
+    
     if damage > 0:
         target_enemy["HP"] -= damage
-        add_log(f"敵{enemy_pos}に{damage}のダメージを与えた! (敵{enemy_pos}残りHP: {target_enemy['HP'] if target_enemy['HP'] > 0 else '0'})")
+        add_log(f"{enemy_name}に{damage}のダメージを与えた! (残りHP: {target_enemy['HP'] if target_enemy['HP'] > 0 else '0'})")
     else:
-        add_log("敵は攻撃を弾いた！")
+        add_log(f"{enemy_name}は攻撃を弾いた！")
+    # --- 修正点：ここまで ---
     
-    # 3. 敵のHPが0以下になったかチェック
     if target_enemy["HP"] <= 0:
-        add_log("敵を倒した!")
+        add_log(f"{enemy_name}を倒した!")
         enemy_exp = target_enemy.get("Exp", 1)
         gain_experience(player_status, enemy_exp)
         # マップから 'E' を消して床 '.' にする
@@ -587,14 +631,14 @@ def enemy_attack_player(enemy, player_status):
     else:
         variance = random.uniform(0.9, 1.1)
         damage = round(base_damage * variance)
-    
-    enemy_pos = (enemy['X'], enemy['Y'])
 
+    enemy_name = enemy.get("name", "敵")
+    
     if damage > 0:
         player_status["HP"] -= damage
-        add_log(f"敵{enemy_pos}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
+        add_log(f"{enemy_name}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
     else:
-        add_log(f"敵{enemy_pos}の攻撃をかわした!")
+        add_log(f"{enemy_name}の攻撃をかわした!")
 
 def try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
     """

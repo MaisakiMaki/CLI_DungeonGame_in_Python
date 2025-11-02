@@ -21,8 +21,13 @@ def draw_map(stdscr, dungeon_map, player_status, enemies_list, items_list):
     # 1b. 敵(E)を上書き
     for enemy in enemies_list:
         ex, ey = enemy['X'], enemy['Y']
+        
+        # (重要) 座標がマップ範囲内か、先にチェック
+        # (※ 0 < ey ではなく 0 <= ey が正しい)
         if 0 <= ey < len(display_map) and 0 <= ex < len(display_map[0]):
-            display_map[ey][ex] = game_data.MAP_SYMBOLS["ENEMY"]
+            
+            # (重要) チェックの「中」で、敵のシンボルを描画
+            display_map[ey][ex] = enemy.get("symbol", game_data.MAP_SYMBOLS["ENEMY"])
             
     # 1c. プレイヤー(@)を上書き
     px, py = player_status['X'], player_status['Y']
@@ -85,16 +90,22 @@ def draw_tutorial_screen(stdscr):
     stdscr.addstr(3, 5, "ようこそ、鳳の間に。")
     
     stdscr.addstr(6, 7, "--- 操作方法 ---")
-    stdscr.addstr(8, 7, "w, a, s, d : 移動")
-    stdscr.addstr(9, 7, "c           : メニュー (アイテム使用 / 装備)")
-    stdscr.addstr(10, 7, "q           : ゲーム終了")
+    stdscr.addstr(8, 7, "--- プレイ画面中 ---")
+    stdscr.addstr(9, 7, "w, a, s, d : 移動/攻撃")
+    stdscr.addstr(10, 7, "c           : メニュー (アイテム使用 / 装備)")
+    stdscr.addstr(11, 7, "q           : ゲーム終了")
     
-    stdscr.addstr(12, 7, "@ : あなた")
-    stdscr.addstr(13, 7, "E : 敵")
-    stdscr.addstr(14, 7, "! : アイテム")
-    stdscr.addstr(15, 7, "< : 階段")
+    stdscr.addstr(13, 7, "@ : あなた")
+    stdscr.addstr(14, 7, "A to Z : 敵")
+    stdscr.addstr(15, 7, "! : アイテム")
+    stdscr.addstr(16, 7, "< : 階段")
+
+
+    stdscr.addstr(18, 7, "--- メニュー画面中 ---")
+    stdscr.addstr(19, 7, "0 to 9 : アイテム選択")
+    stdscr.addstr(20, 7, "d : アイテムを捨てる/床のアイテムと交換")
     
-    stdscr.addstr(20, 5, "【Enterキー】を押してゲームを開始します...")
+    stdscr.addstr(23, 5, "【Enterキー】を押してゲームを開始します...")
 
 def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state):
     # 画面全体を更新する関数
