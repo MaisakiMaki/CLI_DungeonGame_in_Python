@@ -53,6 +53,25 @@ def draw_status(stdscr, status):
     # (プロンプトと被らないよう、プロンプトは y=23 にした)
     stdscr.addstr(24, 0, f"< Atk:{total_atk} Def:{total_def}")
     # stdscr.addstr(24, 0, "-" * 30)
+    effects_str = ""
+    effects_list = status.get("status_effects", [])
+    
+    for effect in effects_list:
+        effect_type = effect.get("type", "???")
+        effect_turns = effect.get("turns", 0)
+        effects_str += f"[{effect_type}:{effect_turns}] "
+        
+    if effects_str:
+        # 警告色 (赤) で表示
+        try:
+            stdscr.attron(curses.color_pair(1)) # ペア1 (赤)
+            stdscr.addstr(25, 0, effects_str)
+            stdscr.attroff(curses.color_pair(1))
+        except curses.error:
+            stdscr.addstr(25, 0, effects_str) # 色が使えなくても表示
+    else:
+        # 何もかかってない時は、行をクリア
+        stdscr.addstr(25, 0, " " * 30)
 
 def draw_log(stdscr, log_list):
     # ログを画面の右側 (x=45) に描画

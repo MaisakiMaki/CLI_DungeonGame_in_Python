@@ -3,7 +3,7 @@ game_state = "tutorial"
 
 player_status = {
     "Lv": 1,
-    "HP": 3,
+    "HP": 20,
     "Max_HP": 20,
     "Atk": 5,
     "Def": 3,
@@ -16,6 +16,8 @@ player_status = {
         "weapon": None,
         "shield": None
     },
+    # (例: [{"type": "POISON", "turns": 10}, {"type": "CONFUSED", "turns": 5}])
+    "status_effects": [],
 
     "turn_counter_for_hunger": 0,
     # 現在の座標のX座標

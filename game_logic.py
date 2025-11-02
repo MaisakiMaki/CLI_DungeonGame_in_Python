@@ -26,7 +26,7 @@ def play_sound_effect(sound_file):
 
 def get_movement_input(stdscr):
     # curses でプレイヤーの入力を受け付ける
-    stdscr.addstr(25, 0, "移動(wasd)、メニュー(c)、ヘルプ(h)、終了(q)を入力      ")
+    stdscr.addstr(26, 0, "移動(wasd)、メニュー(c)、ヘルプ(h)、終了(q)を入力      ")
     
     key_code = stdscr.getch()
     move = ' ' # デフォルト値
@@ -649,7 +649,7 @@ def try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, ne
 
 def get_menu_input(stdscr):
     # curses でメニュー用の入力を受け付ける
-    stdscr.addstr(25, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
+    stdscr.addstr(26, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
     
     key_code = stdscr.getch()
     move = ' ' # デフォルト値
@@ -724,7 +724,7 @@ def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
 
 def get_drop_input(stdscr):
     # curses で捨てるアイテム用の入力を受け付ける
-    stdscr.addstr(25, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
+    stdscr.addstr(26, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
     
     key_code = stdscr.getch()
     move = ' ' # デフォルト値
@@ -826,7 +826,7 @@ def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
 def get_quit_confirm_input(stdscr):
     """終了確認用の入力を受け付ける"""
     # y=25 (プロンプト行) に描画
-    stdscr.addstr(25, 0, "本当に終了しますか？ [y]はい / [n]いいえ      ") 
+    stdscr.addstr(26, 0, "本当に終了しますか？ [y]はい / [n]いいえ      ") 
     
     key_code = stdscr.getch()
     move = ' ' 
