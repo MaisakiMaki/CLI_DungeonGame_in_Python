@@ -323,36 +323,30 @@ def generate_dungeon(status):
 
 def place_enemies(dungeon_map, room, enemies_list, current_floor):
     # 部屋の中にランダムに敵を配置する関数
-
     num_enemies = random.randint(0, MAX_ENEMIES_PER_ROOM)
 
-    # --- 修正点：ここから ---
-
-    # 1. 敵のマスターテーブルを定義
-    # (重み, 最小階層, 最大階層, {敵のテンプレート辞書})
-
-    # 2. この階層で「出現候補」になる敵リストを作る
+    # 1. この階層で「出現候補」になる敵リストを作る
     available_enemies = []
     total_weight = 0
+    # (import した ENEMY_TABLE を使う)
     for (prob, min_floor, max_floor, template) in ENEMY_TABLE:
         if min_floor <= current_floor <= max_floor:
             available_enemies.append((prob, template))
-            total_weight += prob # 重みを合計
+            total_weight += prob 
 
     if total_weight == 0:
         return # この階層に出る敵がいない
 
-    # --- 修正点：ここまで ---
-
+    # 2. 敵を配置するループ
     for _ in range(num_enemies):
-        for _ in range(100):
+        for _ in range(100): # 100回試行
             enemy_x = random.randint(room['x'], room['x'] + room["w"] - 1)
             enemy_y = random.randint(room['y'], room['y'] + room['h'] - 1)
 
             if dungeon_map[enemy_y][enemy_x] == MAP_SYMBOLS["FLOOR"]:
                 
                 # --- 修正点：ここから ---
-
+                
                 # 3. 候補リストから、重みに応じて1体選ぶ
                 enemy_template = None
                 if total_weight > 0:
@@ -365,25 +359,44 @@ def place_enemies(dungeon_map, room, enemies_list, current_floor):
                             break
                 
                 if enemy_template is None:
-                    continue # 念のため
+                    continue 
 
-                # 4. 階層ボーナスを加算して、最終ステータスを決定
-                # (例: 階層が2上がるごとに Atk+1)
-                floor_bonus_atk = current_floor // 2
-                floor_bonus_def = current_floor // 3
-                floor_bonus_hp = current_floor * 1
-
-                new_enemy = {
-                    "name": enemy_template["name"],
-                    "symbol": enemy_template["symbol"],
-                    "HP": enemy_template["base_HP"] + floor_bonus_hp,
-                    "Atk": enemy_template["base_Atk"] + floor_bonus_atk,
-                    "Def": enemy_template["base_Def"] + floor_bonus_def,
-                    "Exp": enemy_template["base_Exp"] + current_floor,
-                    "X": enemy_x,
-                    "Y": enemy_y,
-                    "standing_on": MAP_SYMBOLS["FLOOR"]
-                }
+                # 4. (重要) AIN と Zenith は、ボーナス計算から「除外」する
+                if enemy_template["name"] in ["AIN", "Zenith"]:
+                    new_enemy = {
+                        "name": enemy_template["name"],
+                        "symbol": enemy_template["symbol"],
+                        "HP": enemy_template["base_HP"],
+                        "Atk": enemy_template["base_Atk"],
+                        "Def": enemy_template["base_Def"],
+                        "Exp": enemy_template["base_Exp"],
+                        "X": enemy_x,
+                        "Y": enemy_y,
+                        "standing_on": MAP_SYMBOLS["FLOOR"]
+                    }
+                
+                else:
+                    # 5. それ以外の敵は、ボーナスを計算する
+                    
+                    # (君のアイディア) 
+                    # 「現在の階層」-「出現開始階層」= ボーナス階層
+                    min_floor = enemy_template.get("min_floor", current_floor)
+                    bonus_levels = max(0, current_floor - min_floor)
+                    
+                    # (例: 10階層のボーナスで、強さが 50% (0.5) 増える)
+                    floor_multiplier = 1.0 + (bonus_levels / 20.0) 
+    
+                    new_enemy = {
+                        "name": enemy_template["name"],
+                        "symbol": enemy_template["symbol"],
+                        "HP": round(enemy_template["base_HP"] * floor_multiplier),
+                        "Atk": round(enemy_template["base_Atk"] * floor_multiplier),
+                        "Def": round(enemy_template["base_Def"] * floor_multiplier),
+                        "Exp": enemy_template["base_Exp"] + bonus_levels, 
+                        "X": enemy_x,
+                        "Y": enemy_y,
+                        "standing_on": MAP_SYMBOLS["FLOOR"]
+                    }
                 # --- 修正点：ここまで ---
 
                 enemies_list.append(new_enemy)
@@ -467,7 +480,6 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     )
     se_thread.start()
     
-    # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
     player_atk = get_total_atk(player_status)
     enemy_def = target_enemy["Def"]
 

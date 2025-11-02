@@ -92,6 +92,16 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
 def main_wrapper(stdscr):
 
     try:
+        curses.start_color()
+        curses.use_default_colors()
+
+        curses.init_pair(1, curses.COLOR_RED, -1)
+        curses.init_pair(2, 227, -1)
+
+    except curses.error:
+        pass
+
+    try:
         pygame.mixer.init() # 音楽エンジンを起動
         pygame.mixer.music.load('src/runateElf.mp3') # BGMを読み込む
         pygame.mixer.music.set_volume(0.5) # ★音量を 50% に設定 (0.0 ～ 1.0)

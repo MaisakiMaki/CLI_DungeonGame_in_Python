@@ -111,28 +111,54 @@ def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_l
     # 画面全体を更新する関数
     
     # 1. 画面をクリア (curses)
-    stdscr.clear()
+    stdscr.clear() 
     
+    # --- 修正点：ここから ---
+    
+    # 2. HPに基づいて「文字色モード」を決定
+    color_pair_num = 0 # 0 はデフォルト (白 on 黒)
     try:
-        # --- 修正点：ここから ---
-        if game_state == "tutorial":
-            # 2a. 「チュートリアル画面」を描画
+        if status["Max_HP"] > 0:
+            hp_percent = status['HP'] / status['Max_HP']
+            if hp_percent <= 0.2:
+                color_pair_num = 1 # 赤 (ペア1)
+            elif hp_percent <= 0.5:
+                color_pair_num = 2 # 黄色 (ペア2)
+        
+        # 画面全体に、決定した「文字色」を適用
+        if color_pair_num != 0:
+            stdscr.attron(curses.color_pair(color_pair_num))
+        
+    except curses.error:
+        pass # 色が使えなくても続行
+    # --- 修正点：ここまで ---
+
+    try:
+        # 3. 各パーツを描画
+        # (attron のおかげで、これら全てが自動的に設定した色で描画される)
+        if game_state == "menu" or game_state == "drop_menu":
+            draw_menu(stdscr, status["inventory"], status["Equipment"])
+        
+        elif game_state == "tutorial":
             draw_tutorial_screen(stdscr)
             
-        elif game_state == "menu" or game_state == "drop_menu":
-            # 2b. 「メニュー画面」を描画
-            draw_menu(stdscr, status["inventory"], status["Equipment"])
-            
-        else: 
-            # 2c. 「通常のゲーム画面」を描画
+        else: # (game_state == "playing" など)
             draw_map(stdscr, dungeon_map, status, enemies_list, items_list)
             draw_status(stdscr, status)
             draw_log(stdscr, game_log)
-        # --- 修正点：ここまで ---
 
     except curses.error:
-        pass # (ウィンドウサイズが小さすぎるとエラー)
+        pass 
+        
+    # --- 修正点：ここから ---
+    # 4. 適用した「文字色」を解除
+    try:
+        if color_pair_num != 0:
+            stdscr.attroff(curses.color_pair(color_pair_num))
+    except curses.error:
+        pass
+    # --- 修正点：ここまで ---
 
-    # 3. 最後に、画面を「更新（リフレッシュ）」
+    # 5. 最後に、画面を「更新（リフレッシュ）」
     stdscr.refresh()
 
