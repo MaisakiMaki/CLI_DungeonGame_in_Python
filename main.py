@@ -2,8 +2,8 @@ import curses
 import game_data
 from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list, game_log
 from display import refresh_screen, clear_screen
-from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, get_drop_input
-
+from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, get_drop_input, get_quit_confirm_input, handle_quit_confirm_input
+import pygame
 
 def game_loop(stdscr, dungeon_map, enemies_list, items_list):
     global player_status
@@ -33,7 +33,10 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
         elif game_data.game_state == "drop_menu":
             action = get_drop_input(stdscr) # (get_... は stdscr が必要)
             is_running = handle_drop_input(dungeon_map, player_status, enemies_list, items_list, action)
-
+        
+        elif game_data.game_state == "confirm_quit":
+            action = get_quit_confirm_input(stdscr)
+            is_running = handle_quit_confirm_input(action)
 
         elif game_data.game_state == "next_floor":
             add_log(f"--- {player_status['Floor']}階に到達 ---")
@@ -88,11 +91,21 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
 
 def main_wrapper(stdscr):
 
+    try:
+        pygame.mixer.init() # 音楽エンジンを起動
+        pygame.mixer.music.load('src/runateElf.mp3') # BGMを読み込む
+        pygame.mixer.music.set_volume(0.5) # ★音量を 50% に設定 (0.0 ～ 1.0)
+        pygame.mixer.music.play(-1) # ★-1 で「無限ループ再生」
+    except Exception as e:
+        add_log(f"BGMエラー: {e}")
+
     print("ローグライクゲーム起動")
     DUNGEON_MAP, new_enemies_list, new_items_list = generate_dungeon(player_status)
 
     add_log("ようこそ、鳳の間に。")
     game_loop(stdscr, DUNGEON_MAP, new_enemies_list, new_items_list)
+
+    pygame.mixer.music.stop() # BGM停止
 
         
 

@@ -2,12 +2,27 @@ import curses
 import random
 import game_data
 from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE
+import threading
+try:
+    from playsound import playsound
+except ImportError:
+    playsound = None
 
 def add_log(message):
     #ゲームログに新しいメッセージを追加する関数
     game_log.append(message)
     if len(game_log) > 50:
         game_log.pop
+
+def play_sound_effect(sound_file):
+    """SE再生を「別スレッド」で実行する関数"""
+    if not playsound:
+        return
+    try:
+        playsound(sound_file)
+    except Exception as e:
+        # (SE再生失敗は、ログにも出さず、握りつぶすのが吉)
+        pass
 
 def get_movement_input(stdscr):
     # curses でプレイヤーの入力を受け付ける
@@ -89,6 +104,12 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
             add_log(f"持ち物がいっぱいで、{target_item_data['name']} の上に乗った。")
         else:
             # 空きあり -> 拾う
+            se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('src/Itemget.mp3',),
+                daemon=True
+            )
+            se_thread.start()
             status["inventory"].append(target_item_data)
             items_list.remove(item_to_remove) # データから削除
             add_log(f"{target_item_data['name']} を拾った!")
@@ -135,7 +156,8 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
     elif move == "d": # 右移動(Xが増える)
         moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
     elif move == "c": # メニュー表示
-        # 'c'が押されたらステートをcにする
+        # 'c'が押されたらステートをc
+        # にする
         add_log("メニューを開いた")
         game_data.game_state = "menu"
         moved = False
@@ -143,11 +165,22 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
         add_log("ヘルプを開いた。")
         game_data.game_state = "tutorial" # チュートリアルステートに変更
         moved = False # ターンは消費しない
+
+    elif move == "q": # 終了
+        # (HPが0以下なら、確認せず即座に終了)
+        if status['HP'] <= 0:
+            return False
+            
+        # HPがある場合は、確認ステートへ
+        add_log("本当にゲームを終了しますか？")
+        game_data.game_state = "confirm_quit" # 新しい状態
+        moved = False
+        return True # is_running は True のまま
     
     if moved:
         enemy_turn(dungeon_map, status, enemies_list)
 
-    return move != 'q'
+    return True # 'q' 以外のキーは True (ゲーム続行)
 
 FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
@@ -425,6 +458,13 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
     if target_enemy is None:
         add_log("エラー：見えない敵を攻撃してるね？旅人さん？")
         return
+    
+    se_thread = threading.Thread(
+        target=play_sound_effect,
+        args=('src/player_attack.mp3',),
+        daemon=True
+    )
+    se_thread.start()
     
     # 2. ダメージ計算（プレイヤーの攻撃力 - 敵の防御力）
     player_atk = get_total_atk(player_status)
@@ -769,6 +809,39 @@ def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
         return False
     
     return True
+
+def get_quit_confirm_input(stdscr):
+    """終了確認用の入力を受け付ける"""
+    # y=25 (プロンプト行) に描画
+    stdscr.addstr(25, 0, "本当に終了しますか？ [y]はい / [n]いいえ      ") 
+    
+    key_code = stdscr.getch()
+    move = ' ' 
+    try:
+        move = chr(key_code)
+    except Exception:
+        pass 
+    return move.lower()
+
+def handle_quit_confirm_input(action):
+    """終了確認の入力処理"""
+    
+    if action == 'y':
+        # Yes -> 終了
+        return False # is_running = False
+        
+    elif action == 'x' or action == 'n':
+        # No/Cancel -> ゲーム再開
+        add_log("ゲームを続けます。")
+        game_data.game_state = "playing"
+        return True # is_running = True
+        
+    else:
+        # y/x/n 以外が押された
+        # (何もしない。プロンプトが再描画される)
+        return True # is_running = True
+    
+
 def use_item(player_status, item_index):
     #指定されたインデックスのアイテムを使用する関数
 
@@ -846,6 +919,13 @@ def equip_item(player_status, item_index):
        add_log(f"{item_to_equip.get('name')} は装備できない。")
        return False
     
+    se_thread = threading.Thread(
+        target=play_sound_effect,
+        args=('src/equip.mp3',),
+        daemon=True
+    )
+    se_thread.start()
+    
     # 装備の交換処理
     current_equipment = player_status["Equipment"].get(equip_slot)
 
@@ -892,6 +972,13 @@ def gain_experience(player_status, exp_amount):
         level_up(player_status)
 
 def level_up(player_status):
+
+    se_thread = threading.Thread(
+        target=play_sound_effect,
+        args=('src/level.wav',),
+        daemon=True
+    )
+    se_thread.start()
 
     next_level = player_status["Lv"] + 1
     level_data = LEVEL_UP_TABLE.get(next_level)
