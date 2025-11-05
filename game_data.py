@@ -126,7 +126,7 @@ ENEMY_TABLE = [
     # (Lv8/ATK30 の「一撃 (27-29dmg)」を耐えるため、HPを35-40に設定)
     (30, 15, 29, {
         "name": "ゴブリン隊長", "symbol": "H", "min_floor": 15,
-        "base_HP": 35, "base_Atk": 10, "base_Def": 8, "base_Exp": 15
+        "base_HP": 35, "base_Atk": 12, "base_Def": 10, "base_Exp": 15
     }),
     (30, 15, 24, {
         "name": "暗黒の眼", "symbol": "D", "min_floor": 15,
@@ -134,18 +134,18 @@ ENEMY_TABLE = [
     }),
     (30, 15, 29, {
         "name": "痺れ蛇", "symbol": "N", "min_floor": 15,
-        "base_HP": 35, "base_Atk": 15, "base_Def": 10, "base_Exp": 18
+        "base_HP": 35, "base_Atk": 13, "base_Def": 10, "base_Exp": 18
     }),
     (20, 20, 39, {
         "name": "オアシスクラゲ", "symbol": "O", "min_floor": 20,
-        "base_HP": 40, "base_Atk": 10, "base_Def": 15, "base_Exp": 20
+        "base_HP": 50, "base_Atk": 10, "base_Def": 15, "base_Exp": 20
     }),
 
     # --- 25F-39F (vs Player Lv12-14, ATK 45-55) ---
     # (Lv12/ATK45 の「一撃 (40-42dmg)」を耐えるため、HPを45-50に設定)
     (20, 25, 35, {
         "name": "ブレインショッカー", "symbol": "B", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 10, "base_Def": 8, "base_Exp": 25
+        "base_HP": 45, "base_Atk": 22, "base_Def": 10, "base_Exp": 25
     }),
     (20, 25, 39, {
         "name": "炎の鳥", "symbol": "I", "min_floor": 25,
@@ -153,26 +153,26 @@ ENEMY_TABLE = [
     }),
     (20, 25, 39, {
         "name": "ジェットより速き者", "symbol": "J", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 10, "base_Def": 5, "base_Exp": 30
+        "base_HP": 45, "base_Atk": 12, "base_Def": 5, "base_Exp": 30
     }),
     (20, 25, 39, {
         "name": "痺獣クイックシルバー", "symbol": "Q", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 15, "base_Def": 10, "base_Exp": 30
+        "base_HP": 45, "base_Atk": 20, "base_Def": 10, "base_Exp": 30
     }),
 
     # --- 30F-50F (vs Player Lv13-15, ATK 50-63) ---
     # (Lv13/ATK50 の「一撃 (45-48dmg)」を耐えるため、HPを50-60に設定)
     (20, 30, 39, {
         "name": "押しだしの巨人", "symbol": "K", "min_floor": 30,
-        "base_HP": 60, "base_Atk": 15, "base_Def": 10, "base_Exp": 35
+        "base_HP": 60, "base_Atk": 30, "base_Def": 10, "base_Exp": 35
     }),
     (20, 30, 39, {
         "name": "月うさぎ", "symbol": "M", "min_floor": 30,
-        "base_HP": 50, "base_Atk": 40, "base_Def": 5, "base_Exp": 40
+        "base_HP": 10, "base_Atk": 40, "base_Def": 5, "base_Exp": 40
     }),
     (15, 30, 50, {
         "name": "ウラン鉱石虫", "symbol": "U", "min_floor": 30,
-        "base_HP": 50, "base_Atk": 5, "base_Def": 40, "base_Exp": 30
+        "base_HP": 50, "base_Atk": 10, "base_Def": 45, "base_Exp": 30
     }),
 
     # --- 40F-50F (vs Player Lv15, ATK 63) ---
@@ -182,8 +182,8 @@ ENEMY_TABLE = [
         "base_HP": 60, "base_Atk": 40, "base_Def": 35, "base_Exp": 50
     }),
     (10, 40, 50, {
-        "name": "月兎ルナ", "symbol": "L", "min_floor": 40,
-        "base_HP": 50, "base_Atk": 40, "base_Def": 5, "base_Exp": 50
+        "name": "玉兎ルナ", "symbol": "L", "min_floor": 40,
+        "base_HP": 45, "base_Atk": 45, "base_Def": 5, "base_Exp": 50
     }),
     (10, 40, 50, {
         "name": "光より速きタキオン", "symbol": "T", "min_floor": 40,
@@ -195,7 +195,7 @@ ENEMY_TABLE = [
     }),
     (10, 40, 50, {
         "name": "未確認生物ゼノイド", "symbol": "X", "min_floor": 40,
-        "base_HP": 75, "base_Atk": 30, "base_Def": 40, "base_Exp": 70
+        "base_HP": 75, "base_Atk": 35, "base_Def": 40, "base_Exp": 70
     }),
     (10, 40, 50, {
         "name": "陰陽", "symbol": "Y", "min_floor": 40,

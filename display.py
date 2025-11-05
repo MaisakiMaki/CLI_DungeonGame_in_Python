@@ -29,11 +29,6 @@ def draw_map(stdscr, dungeon_map, player_status, enemies_list, items_list):
             # (重要) チェックの「中」で、敵のシンボルを描画
             display_map[ey][ex] = enemy.get("symbol", game_data.MAP_SYMBOLS["ENEMY"])
             
-    # 1c. プレイヤー(@)を上書き
-    px, py = player_status['X'], player_status['Y']
-    if 0 <= py < len(display_map) and 0 <= px < len(display_map[0]):
-        display_map[py][px] = game_data.MAP_SYMBOLS["PLAYER"]
-
     # 2. 完成したマップを、(y, x) 座標を指定して描画
     # (0, 0) は左上隅
     stdscr.addstr(0, 0, f"--- 鳳の間 {player_status['Floor']}階 ---")
@@ -129,32 +124,28 @@ def draw_tutorial_screen(stdscr):
 def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state):
     # 画面全体を更新する関数
     
-    # 1. 画面をクリア (curses)
-    stdscr.clear() 
-    
-    # --- 修正点：ここから ---
-    
-    # 2. HPに基づいて「文字色モード」を決定
-    color_pair_num = 0 # 0 はデフォルト (白 on 黒)
+    # 1. HPに基づいて「全体の文字色」を決定
+    color_pair_num = 0 # 0 はデフォルト
     try:
         if status["Max_HP"] > 0:
             hp_percent = status['HP'] / status['Max_HP']
             if hp_percent <= 0.2:
-                color_pair_num = 1 # 赤 (ペア1)
+                color_pair_num = 1 # 赤
             elif hp_percent <= 0.5:
-                color_pair_num = 2 # 黄色 (ペア2)
+                color_pair_num = 2 # 黄色
         
-        # 画面全体に、決定した「文字色」を適用
+        # 2. 画面をクリア
+        stdscr.clear() 
+        
+        # 3. 「全体の文字色」をON
         if color_pair_num != 0:
             stdscr.attron(curses.color_pair(color_pair_num))
         
     except curses.error:
-        pass # 色が使えなくても続行
-    # --- 修正点：ここまで ---
+        pass 
 
     try:
-        # 3. 各パーツを描画
-        # (attron のおかげで、これら全てが自動的に設定した色で描画される)
+        # 4. 各パーツを描画 (マップ、ステータス、ログなど)
         if game_state == "menu" or game_state == "drop_menu":
             draw_menu(stdscr, status["inventory"], status["Equipment"])
         
@@ -166,18 +157,28 @@ def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_l
             draw_status(stdscr, status)
             draw_log(stdscr, game_log)
 
+        # --- 修正点：ここから ---
+        # 5. (重要) プレイヤー(@) を「緑色」で上書き描画
+        #    (メニューやチュートリアル画面では描画しない)
+        if game_state not in ["menu", "drop_menu", "tutorial"]:
+            px, py = status['X'], status['Y']
+            player_symbol = game_data.MAP_SYMBOLS["PLAYER"]
+            try:
+                # ペア3 (緑) で @ を描画
+                stdscr.addstr(py + 1, px, player_symbol, curses.color_pair(3))
+            except curses.error:
+                pass # 画面端のエラーを無視
+        # --- 修正点：ここまで ---
+
     except curses.error:
         pass 
         
-    # --- 修正点：ここから ---
-    # 4. 適用した「文字色」を解除
+    # 6. 「全体の文字色」をOFF
     try:
         if color_pair_num != 0:
             stdscr.attroff(curses.color_pair(color_pair_num))
     except curses.error:
         pass
-    # --- 修正点：ここまで ---
 
-    # 5. 最後に、画面を「更新（リフレッシュ）」
+    # 7. 画面を更新
     stdscr.refresh()
-

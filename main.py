@@ -97,6 +97,7 @@ def main_wrapper(stdscr):
 
         curses.init_pair(1, curses.COLOR_RED, -1)
         curses.init_pair(2, 227, -1)
+        curses.init_pair(3, curses.COLOR_GREEN, -1) # ペア3: 緑 (プレイヤー)
 
     except curses.error:
         pass
