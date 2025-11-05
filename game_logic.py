@@ -611,12 +611,25 @@ def enemy_attack_player(enemy, player_status):
         player_status["HP"] -= damage
         add_log(f"{enemy_name}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
 
-        if enemy_name == "ポイズンスネーク" and random.randint(1, 100) <= 30:
+        ability = enemy.get("ability", "none")
+        rand_val = random.randint(1, 100) # 確率は1回だけ振る
+
+        # (1) 毒 (POISON)
+        if ability == "poison" and rand_val <= 30: # 30%
             if not is_affected_by(player_status, "POISON"):
-                add_log("毒をうけた!")
+                add_log("毒をうけた！")
                 player_status["status_effects"].append(
                     {"type": "POISON", "turns": 10}
                 )
+        
+        # (2) 猛毒 (STRONG_POISON)
+        elif ability == "strong_poison" and rand_val <= 20: # 20%
+             if not is_affected_by(player_status, "STRONG_POISON"):
+                add_log("猛毒をうけた！")
+                player_status["status_effects"].append(
+                    {"type": "STRONG_POISON", "turns": 10}
+                )
+        
     else:
         add_log(f"{enemy_name}の攻撃をかわした!")
 
