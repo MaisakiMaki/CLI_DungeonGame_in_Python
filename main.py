@@ -2,7 +2,10 @@ import curses
 import game_data
 from game_data import player_status, DUNGEON_MAP, MAP_SYMBOLS, enemies_list, game_log
 from display import refresh_screen, clear_screen
-from game_logic import get_movement_input, handle_input, generate_dungeon, add_log, get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, get_drop_input, get_quit_confirm_input, handle_quit_confirm_input
+
+from game_logic import (get_movement_input, handle_input, generate_dungeon, add_log, 
+                        get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, 
+                        get_drop_input, get_quit_confirm_input, handle_quit_confirm_input)
 import pygame
 
 def game_loop(stdscr, dungeon_map, enemies_list, items_list):

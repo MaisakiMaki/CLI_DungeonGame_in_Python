@@ -124,7 +124,9 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
 def consume_hunger(status):
     # 空腹度を計算する関数
     if status['Hung'] > 0:
-        if status["HP"] < status["Max_HP"]:
+
+        is_poisoned = is_affected_by(status, "POISON") or is_affected_by(status, "STRONG_POISON")
+        if status["HP"] < status["Max_HP"] and not is_poisoned:
             status["HP"] += 1
     else:
         status['HP'] -= 1
@@ -514,6 +516,8 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
 
 def enemy_turn(dungeon_map, player_status, enemies_list):
     #すべての敵の行動処理を行う関数
+    handle_status_effects(player_status)
+
     if not enemies_list:
         return
     
@@ -606,6 +610,13 @@ def enemy_attack_player(enemy, player_status):
     if damage > 0:
         player_status["HP"] -= damage
         add_log(f"{enemy_name}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
+
+        if enemy_name == "ポイズンスネーク" and random.randint(1, 100) <= 30:
+            if not is_affected_by(player_status, "POISON"):
+                add_log("毒をうけた!")
+                player_status["status_effects"].append(
+                    {"type": "POISON", "turns": 10}
+                )
     else:
         add_log(f"{enemy_name}の攻撃をかわした!")
 
@@ -1017,5 +1028,40 @@ def level_up(player_status):
     add_log(f"最大HPが {level_data['Max_HP_Up']}、攻撃力が {level_data['Atk_Up']}、防御力が {level_data['Def_Up']} 上がった!")
 
 
+def is_affected_by(player_status, effect_type):
+    """プレイヤーが特定の状態異常にかかっているかチェックする"""
+    for effect in player_status.get("status_effects", []):
+        if effect.get("type") == effect_type:
+            return True
+    return False
 
+def handle_status_effects(player_status):
+    """
+    毎ターン、プレイヤーにかかっている状態異常を処理する
+    (ダメージ、回復、ターン経過など)
+    """
+    # (リストを逆順(reversed)でループするのがコツじゃ。
+    #  途中で .remove() してもループが壊れない)
+    for effect in reversed(player_status.get("status_effects", [])):
+        
+        effect_type = effect.get("type")
+        
+        # --- (1) 効果の適用 ---
+        if effect_type == "POISON":
+            add_log("毒により 1 のダメージを受けた。")
+            player_status["HP"] -= 1
+        
+        elif effect_type == "STRONG_POISON":
+             add_log("猛毒により 3 のダメージを受けた。")
+             player_status["HP"] -= 3
+
+        # (ここに "CONFUSED" などの処理も追加していく)
+
+        # --- (2) ターンの経過 ---
+        effect["turns"] -= 1
+        
+        # --- (3) 効果の終了 ---
+        if effect["turns"] <= 0:
+            add_log(f"[{effect_type}] の効果が切れた。")
+            player_status["status_effects"].remove(effect)
 

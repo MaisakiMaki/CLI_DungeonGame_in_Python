@@ -95,120 +95,146 @@ ENEMY_TABLE = [
     # --- 1F-14F (vs Player Lv1-7, ATK 5-25) ---
     (50, 1, 14, {
         "name": "ゴブリン", "symbol": "G", "min_floor": 1,
-        "base_HP": 10, "base_Atk": 5, "base_Def": 2, "base_Exp": 5
+        "base_HP": 10, "base_Atk": 5, "base_Def": 2, "base_Exp": 5,
+        "ability": "none"
     }),
     (50, 5, 29, {
         "name": "スライム", "symbol": "S", "min_floor": 5,
-        "base_HP": 20, "base_Atk": 5, "base_Def": 8, "base_Exp": 8
+        "base_HP": 20, "base_Atk": 5, "base_Def": 8, "base_Exp": 8,
+        "ability": "split"
     }),
     (40, 5, 19, {
         "name": "石炭虫", "symbol": "C", "min_floor": 5,
-        "base_HP": 25, "base_Atk": 5, "base_Def": 10, "base_Exp": 6
+        "base_HP": 25, "base_Atk": 5, "base_Def": 10, "base_Exp": 6,
+        "ability": "burn"
     }),
     (30, 5, 14, {
         "name": "ポイズンスネーク", "symbol": "P", "min_floor": 5,
-        "base_HP": 20, "base_Atk": 5, "base_Def": 3, "base_Exp": 7
+        "base_HP": 20, "base_Atk": 5, "base_Def": 3, "base_Exp": 7,
+        "ability": "poison"
     }),
     (30, 10, 19, {
         "name": "速き者", "symbol": "F", "min_floor": 10,
-        "base_HP": 25, "base_Atk": 3, "base_Def": 3, "base_Exp": 10
+        "base_HP": 25, "base_Atk": 3, "base_Def": 3, "base_Exp": 10,
+        "ability": "act_twice"
     }),
     (30, 10, 24, {
         "name": "腐った死体", "symbol": "R", "min_floor": 10,
-        "base_HP": 35, "base_Atk": 10, "base_Def": 8, "base_Exp": 12
+        "base_HP": 35, "base_Atk": 10, "base_Def": 8, "base_Exp": 12,
+        "ability": "rotten"
     }),
     (30, 10, 19, {
         "name": "笑い歩く草", "symbol": "W", "min_floor": 10,
-        "base_HP": 30, "base_Atk": 8, "base_Def": 5, "base_Exp": 10
+        "base_HP": 30, "base_Atk": 8, "base_Def": 5, "base_Exp": 10,
+        "ability": "none"
     }),
 
     # --- 15F-29F (vs Player Lv8-12, ATK 30-45) ---
     # (Lv8/ATK30 の「一撃 (27-29dmg)」を耐えるため、HPを35-40に設定)
     (30, 15, 29, {
         "name": "ゴブリン隊長", "symbol": "H", "min_floor": 15,
-        "base_HP": 35, "base_Atk": 12, "base_Def": 10, "base_Exp": 15
+        "base_HP": 35, "base_Atk": 12, "base_Def": 10, "base_Exp": 15,
+        "ability": "none"
     }),
     (30, 15, 24, {
         "name": "暗黒の眼", "symbol": "D", "min_floor": 15,
-        "base_HP": 35, "base_Atk": 15, "base_Def": 10, "base_Exp": 18
+        "base_HP": 35, "base_Atk": 15, "base_Def": 10, "base_Exp": 18,
+        "ability": "blind"
     }),
     (30, 15, 29, {
         "name": "痺れ蛇", "symbol": "N", "min_floor": 15,
-        "base_HP": 35, "base_Atk": 13, "base_Def": 10, "base_Exp": 18
+        "base_HP": 35, "base_Atk": 13, "base_Def": 10, "base_Exp": 18,
+        "ability": "paralysis"
     }),
     (20, 20, 39, {
         "name": "オアシスクラゲ", "symbol": "O", "min_floor": 20,
-        "base_HP": 50, "base_Atk": 10, "base_Def": 15, "base_Exp": 20
+        "base_HP": 50, "base_Atk": 10, "base_Def": 15, "base_Exp": 20,
+        "ability": "heal"
     }),
 
     # --- 25F-39F (vs Player Lv12-14, ATK 45-55) ---
     # (Lv12/ATK45 の「一撃 (40-42dmg)」を耐えるため、HPを45-50に設定)
     (20, 25, 35, {
         "name": "ブレインショッカー", "symbol": "B", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 22, "base_Def": 10, "base_Exp": 25
+        "base_HP": 45, "base_Atk": 22, "base_Def": 10, "base_Exp": 25,
+        "ability": "confuse"
     }),
     (20, 25, 39, {
         "name": "炎の鳥", "symbol": "I", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 25, "base_Def": 10, "base_Exp": 30
+        "base_HP": 45, "base_Atk": 25, "base_Def": 10, "base_Exp": 30,
+        "ability": "burn"
     }),
     (20, 25, 39, {
         "name": "ジェットより速き者", "symbol": "J", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 12, "base_Def": 5, "base_Exp": 30
+        "base_HP": 45, "base_Atk": 12, "base_Def": 5, "base_Exp": 30,
+        "ability": "act_twice"
     }),
     (20, 25, 39, {
         "name": "痺獣クイックシルバー", "symbol": "Q", "min_floor": 25,
-        "base_HP": 45, "base_Atk": 20, "base_Def": 10, "base_Exp": 30
+        "base_HP": 45, "base_Atk": 20, "base_Def": 10, "base_Exp": 30,
+        "ability": "paralysis"
     }),
 
     # --- 30F-50F (vs Player Lv13-15, ATK 50-63) ---
     # (Lv13/ATK50 の「一撃 (45-48dmg)」を耐えるため、HPを50-60に設定)
     (20, 30, 39, {
         "name": "押しだしの巨人", "symbol": "K", "min_floor": 30,
-        "base_HP": 60, "base_Atk": 30, "base_Def": 10, "base_Exp": 35
+        "base_HP": 60, "base_Atk": 30, "base_Def": 10, "base_Exp": 35,
+        "ability": "pusher"
     }),
     (20, 30, 39, {
         "name": "月うさぎ", "symbol": "M", "min_floor": 30,
-        "base_HP": 10, "base_Atk": 40, "base_Def": 5, "base_Exp": 40
+        "base_HP": 10, "base_Atk": 40, "base_Def": 5, "base_Exp": 40,
+        "ability": "gun_attack"
     }),
     (15, 30, 50, {
         "name": "ウラン鉱石虫", "symbol": "U", "min_floor": 30,
-        "base_HP": 50, "base_Atk": 10, "base_Def": 45, "base_Exp": 30
+        "base_HP": 50, "base_Atk": 10, "base_Def": 45, "base_Exp": 30,
+        "ability": "strong_poison"
     }),
 
     # --- 40F-50F (vs Player Lv15, ATK 63) ---
     # (Lv15/ATK63 の「一撃 (45-50dmg)」を耐えるため、HPを50-70に設定)
     (10, 40, 50, {
         "name": "ゴブリンの長老", "symbol": "E", "min_floor": 40,
-        "base_HP": 60, "base_Atk": 40, "base_Def": 35, "base_Exp": 50
+        "base_HP": 60, "base_Atk": 40, "base_Def": 35, "base_Exp": 50,
+        "ability": "none"
     }),
     (10, 40, 50, {
         "name": "玉兎ルナ", "symbol": "L", "min_floor": 40,
-        "base_HP": 45, "base_Atk": 45, "base_Def": 5, "base_Exp": 50
+        "base_HP": 45, "base_Atk": 45, "base_Def": 5, "base_Exp": 50,
+        "ability": "gun_attack"
     }),
     (10, 40, 50, {
         "name": "光より速きタキオン", "symbol": "T", "min_floor": 40,
-        "base_HP": 50, "base_Atk": 30, "base_Def": 20, "base_Exp": 60
+        "base_HP": 50, "base_Atk": 30, "base_Def": 20, "base_Exp": 60,
+        "ability": "act_twice"
     }),
     (10, 40, 50, {
         "name": "ベールに覆われしオーロラ", "symbol": "V", "min_floor": 40,
-        "base_HP": 60, "base_Atk": 25, "base_Def": 30, "base_Exp": 60
+        "base_HP": 60, "base_Atk": 25, "base_Def": 30, "base_Exp": 60,
+        "ability": "aurora_veil"
     }),
     (10, 40, 50, {
         "name": "未確認生物ゼノイド", "symbol": "X", "min_floor": 40,
-        "base_HP": 75, "base_Atk": 35, "base_Def": 40, "base_Exp": 70
+        "base_HP": 75, "base_Atk": 35, "base_Def": 40, "base_Exp": 70,
+        "ability": "none"
     }),
     (10, 40, 50, {
         "name": "陰陽", "symbol": "Y", "min_floor": 40,
-        "base_HP": 60, "base_Atk": 35, "base_Def": 35, "base_Exp": 70
+        "base_HP": 60, "base_Atk": 35, "base_Def": 35, "base_Exp": 70,
+        "ability": "reverse"
     }),
 
     # --- BOSS (40F-50F) (固定ステータス) ---
     (1, 40, 50, {
         "name": "Ain", "symbol": "A", "min_floor": 40,
-        "base_HP": 100, "base_Atk": 50, "base_Def": 50, "base_Exp": 200
+        "base_HP": 100, "base_Atk": 50, "base_Def": 50, "base_Exp": 200,
+        "ability": "none"
     }),
     (1, 40, 50, {
         "name": "Zenith", "symbol": "Z", "min_floor": 40,
-        "base_HP": 100, "base_Atk": 60, "base_Def": 30, "base_Exp": 200
+        "base_HP": 100, "base_Atk": 60, "base_Def": 30, "base_Exp": 200,
+        "ability": "none"
     }),
 ]
