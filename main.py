@@ -21,6 +21,23 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
         # 2. 最新の状態を描画 (これは stdscr が必要なので OK)
         refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state, is_blind_now)
 
+        num_player_actions = 1
+        num_enemy_actions = 1
+
+        equipped_ring = player_status["Equipment"].get("ring")
+        is_fast = equipped_ring and equipped_ring.get("ability") == "act_twice"
+        is_paralyzed = is_affected_by(player_status, "PARALYSIS")
+
+        if is_fast and is_paralyzed:
+            num_player_actions = 1
+            num_enemy_actions = 1
+        elif is_fast:
+            num_player_actions = 2
+            num_enemy_actions = 1
+        elif is_paralyzed:
+            num_player_actions = 1
+            num_enemy_actions = 2
+
         # 3. ゲームの状態によって処理を分岐
         if game_data.game_state == "tutorial":
             # チュートリアル画面では、Enterキーだけを待つ
@@ -29,16 +46,50 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
                 game_data.game_state = "playing" # ゲーム開始
         
         elif game_data.game_state == "playing":
-                action = get_movement_input(stdscr) # (get_... は stdscr が必要)
-                is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
+                for _ in range(num_player_actions):
+                    if player_status['HP'] <= 0: break
+                    action = get_movement_input(stdscr) # (get_... は stdscr が必要)
+                    is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
+
+                    if not is_running: break
+                    if game_data.game_state != "playing": break
+                    if num_player_actions > 1:
+                        refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state, is_blind_now)
+
+                if not is_running or player_status['HP'] <= 0:
+                    continue
+                    
+                if num_enemy_actions > 1:
+                    add_log("動きが鈍く、敵が連続で行動する!")
+
+                for _ in range(num_enemy_actions):
+                    if player_status['HP'] <= 0: break
+                    enemy_turn(dungeon_map, player_status, enemies_list)
         
         elif game_data.game_state == "menu":
             action = get_menu_input(stdscr) # (get_... は stdscr が必要)
             is_running = handle_menu_input(dungeon_map, player_status, enemies_list, items_list, action)
+            if is_running and game_data.game_state == "playing":
+
+                if num_enemy_actions > 1:
+                    add_log("動きが鈍く、敵が連続で行動する!")
+
+                for _ in range(num_enemy_actions):
+                    if player_status['HP'] <= 0: break
+                    enemy_turn(dungeon_map, player_status, enemies_list)
+
+
         
         elif game_data.game_state == "drop_menu":
             action = get_drop_input(stdscr) # (get_... は stdscr が必要)
             is_running = handle_drop_input(dungeon_map, player_status, enemies_list, items_list, action)
+            if is_running and game_data.game_state == "playing":
+                if num_enemy_actions > 1:
+                    add_log("動きが鈍く、敵が連続で行動する!")
+
+                for _ in range(num_enemy_actions):
+                    if player_status['HP'] <= 0: break
+                    enemy_turn(dungeon_map, player_status, enemies_list)
         
         elif game_data.game_state == "confirm_quit":
             action = get_quit_confirm_input(stdscr)

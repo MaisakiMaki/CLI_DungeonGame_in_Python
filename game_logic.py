@@ -211,9 +211,6 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
         game_data.game_state = "confirm_quit" # 新しい状態
         moved = False
         return True # is_running は True のまま
-    
-    if moved:
-        enemy_turn(dungeon_map, status, enemies_list)
 
     return True # 'q' 以外のキーは True (ゲーム続行)
 
@@ -602,6 +599,11 @@ def combat(dungeon_map, player_status, enemies_list, items_list, enemy_x, enemy_
     if damage > 0:
         target_enemy["HP"] -= damage
         add_log(f"{enemy_name}に{damage}のダメージを与えた! (残りHP: {target_enemy['HP'] if target_enemy['HP'] > 0 else '0'})")
+        equipped_ring = player_status["Equipment"].get("ring")
+        if equipped_ring and equipped_ring.get("ability") == "drain":
+            drain_hp = damage // 2
+            add_log(f"奇跡のリングによって、体力が {drain_hp} 回復した!")
+            player_status["HP"] = min(player_status["HP"] + drain_hp, player_status["Max_HP"])
     else:
         add_log(f"{enemy_name}は攻撃を弾いた！")
     # --- 修正点：ここまで ---
@@ -612,11 +614,12 @@ def combat(dungeon_map, player_status, enemies_list, items_list, enemy_x, enemy_
         gain_experience(player_status, enemy_exp)
 
         drop_item_name = None
+        item_data_to_drop = None
         drop_chance = random.randint(1, 100)
 
         if enemy_name == "Ain":
             drop_item_name = "始まりの盾"
-        elif enemy_name == "ゴブリン":
+        elif enemy_name == "Zenith":
             drop_item_name = "終わりの剣"
         elif enemy_name == "ベールに覆われしオーロラ":
             if drop_chance <= 30:
@@ -658,6 +661,8 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
     if not enemies_list:
         return
     
+
+    
     player_x, player_y = player_status["X"], player_status["Y"]
     
     # 敵が複数いてもいいようにリストをコピーして処理する
@@ -669,15 +674,12 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
         
         # 2a. 敵の能力をチェック
         ability = enemy.get("ability", None)
-        
-        
-        # (ability が "act_twice" なら 2回、それ以外は 1回)
+
         num_actions = 2 if ability == "act_twice" else 1
 
-        # 2b. 行動回数ぶん、AIループを回す
         for _ in range(num_actions):
+
             
-            # (重要) 1回目の行動でプレイヤーが死んでいないかチェック
             if player_status['HP'] <= 0:
                 break # プレイヤーが死んだら、この敵の行動は即終了
                 
@@ -803,151 +805,6 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
                 if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
                     continue # 1回目の行動成功 -> 2回目の行動へ
 
-    if is_affected_by(player_status, "PARALYSIS"):
-    
-    # 敵が複数いてもいいようにリストをコピーして処理する
-        add_log("動きが鈍く、敵が連続で行動する！")
-        for enemy in enemies_list[:]:
-            if enemy not in enemies_list:
-                continue
-            
-        # --- 修正点：ここから ---
-        
-        # 2a. 敵の能力をチェック
-            ability = enemy.get("ability", None)
-            
-        
-        # (ability が "act_twice" なら 2回、それ以外は 1回)
-            num_actions = 2 if ability == "act_twice" else 1
-
-        # 2b. 行動回数ぶん、AIループを回す
-            for _ in range(num_actions):
-            
-            # (重要) 1回目の行動でプレイヤーが死んでいないかチェック
-                if player_status['HP'] <= 0:
-                    break # プレイヤーが死んだら、この敵の行動は即終了
-                
-            # (重要) 1回目の行動で敵が（何らかの理由で）死んでいないかチェック
-                if enemy not in enemies_list:
-                    break # 敵がリストから消えたら終了
-
-            # 2c. (ここから下は、元の enemy_turn のAIロジックとまったく同じ)
-                enemy_x, enemy_y = enemy["X"], enemy["Y"]
-                distance = abs(player_x - enemy_x) + abs(player_y - enemy_y)
-
-                is_player_near = max(abs(player_x - enemy_x), abs(player_y - enemy_y)) <= 2
-
-                if ability == "heal":
-                    heal_amount = enemy.get("Atk", 10)
-                    healed_someone = False
-
-                    for dy in range(-2, 2):
-                        for dx in range(-2, 2):
-                            check_x, check_y = enemy_x + dx, enemy_y + dy
-                            target_ally = None
-
-                            for e in enemies_list:
-                                if e is not enemy and e.get("HP", 999) < e.get("Max_HP", 0) and (e['X'], e['Y']) == (check_x, check_y):
-                                    target_ally = e
-                                    break
-                            
-                            if target_ally:
-                                handle_heal_ally(enemy, target_ally, heal_amount)
-                                healed_someone = True
-                                break
-                        
-                        if healed_someone:
-                            continue
-
-                elif ability == "split" and is_player_near and enemy in enemies_list and random.randint(1, 100) <= SPRIT_CHANCE:
-
-                    if len(enemies_list) >= MAX_ENEMIES_TOTAL:
-                        add_log("スライムは分裂しようとしたが、敵が多すぎて失敗した!")
-                        continue
-
-                    possible_split_coords = []
-                    for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
-                        check_x, check_y = enemy["X"] + dx, enemy["Y"] + dy
-
-                        if not (0 <= check_y < FLOOR_HEIGHT and 0 <= check_x < FLOOR_WIDTH) or dungeon_map[check_y][check_x] != MAP_SYMBOLS["FLOOR"]:
-                            continue
-
-                        if (check_x, check_y) == (player_x, player_y):
-                            continue
-
-                        is_occupied = False
-                        for e in enemies_list:
-                            if (e['X'], e['Y']) == (check_x, check_y):
-                                is_occupied = True
-                                break
-                        if is_occupied:
-                            continue
-
-                        possible_split_coords.append((check_x, check_y))
-                
-                    if possible_split_coords:
-                        new_x, new_y = random.choice(possible_split_coords)
-
-                        original_hp = enemy['HP']
-
-                        new_hp = max(1, original_hp // 2)
-                        enemy['HP'] = max(1, original_hp - new_hp)
-
-                        new_split = {
-                            "name": enemy["name"],
-                            "symbol": enemy["symbol"],
-                            "HP": new_hp,
-                            "Max_HP": enemy["HP"],
-                            "Atk": enemy["Atk"],
-                            "Def": enemy["Def"],
-                            "Exp": enemy["Exp"],
-                            "X": new_x,
-                            "Y": new_y,
-                            "standing_on": MAP_SYMBOLS["FLOOR"],
-                            "ability": enemy["ability"]
-                        }
-                        enemies_list.append(new_split)
-                        add_log(f"{enemy.get('name', '敵')}は分裂した!")
-                        continue
-            
-
-                elif ability == "gun_shot" or ability == "pro_shot":
-                    if check_los(dungeon_map, enemy_x, enemy_y, player_x, player_y, 3):
-                        add_log(f"{enemy.get('name', '敵')}が遠距離攻撃を放った!")
-                        enemy_attack_player(dungeon_map, enemy, player_status)
-                        continue
-            
-                    
-                move_x, move_y = 0, 0
-
-                if distance <= SIGHT_RANGE:
-                # 索敵範囲内：プレイヤーを追跡
-                    move_x = 1 if player_x > enemy_x else -1 if player_x < enemy_x else 0
-                    move_y = 1 if player_y > enemy_y else -1 if player_y < enemy_y else 0
-                else:
-                # 索敵範囲外：ランダムウォーク
-                    possible_moves = [(0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
-                    move_x, move_y = random.choice(possible_moves)
-
-            # 2d. 移動試行
-                if abs(player_x - enemy_x) >= abs(player_y - enemy_y):
-                # Xを優先
-                    new_x, new_y = enemy_x + move_x, enemy_y
-                    if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
-                        continue # 1回目の行動成功 -> 2回目の行動へ
-                
-                    new_x, new_y = enemy_x, enemy_y + move_y
-                    if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
-                        continue # 1回目の行動成功 -> 2回目の行動へ
-                else:
-                    # Y方向を優先
-                    new_x, new_y = enemy_x, enemy_y + move_y
-                    if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
-                        continue # 1回目の行動成功 -> 2回目の行動へ
-
-                    new_x, new_y = enemy_x + move_x, enemy_y
-                    if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
-                        continue # 1回目の行動成功 -> 2回目の行動へ
             
 def enemy_attack_player(dungeon_map, enemy, player_status):
     #敵がプレイヤーを攻撃する関数
@@ -966,6 +823,11 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
     else:
         variance = random.uniform(0.9, 1.1)
         damage = round(base_damage * variance)
+    
+    equipped_ring = player_status["Equipment"].get("ring")
+    if equipped_ring and equipped_ring.get("ability") == "aurora_veil":
+        add_log("オーロラの指輪が、ダメージを半分にした!")
+        damage = damage // 2
 
     enemy_name = enemy.get("name", "敵")
     ability = enemy.get("ability", "none")
@@ -1401,6 +1263,9 @@ def equip_item(player_status, item_index):
         equip_slot = "weapon"
     elif item_type == "shield":
         equip_slot = "shield"
+    elif item_type == "ring":
+        equip_slot = "ring"
+
     else:
        add_log(f"{item_to_equip.get('name')} は装備できない。")
        return False

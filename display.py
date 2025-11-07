@@ -74,7 +74,7 @@ def draw_log(stdscr, log_list):
     stdscr.addstr(0, 45, "-" * 30)
     stdscr.addstr(1, 45, "【ログ】")
     
-    display_logs = log_list[-10:] # 最大10件
+    display_logs = log_list[-15:] # 最大10件
     for i, message in enumerate(display_logs):
         # (y=2 から 11 まで)
         stdscr.addstr(i + 2, 45, f"> {message.ljust(27)}") # ljust で長さを揃える
@@ -87,17 +87,20 @@ def draw_menu(stdscr, inventory, Equipment):
     stdscr.addstr(3, 2, "【装備】")
     weapon = Equipment.get("weapon")
     shield = Equipment.get("shield")
+    ring = Equipment.get("ring")
+
     stdscr.addstr(4, 4, f"武器: {weapon['name'] if weapon else 'なし'}")
     stdscr.addstr(5, 4, f"盾  : {shield['name'] if shield else 'なし'}")
+    stdscr.addstr(6, 4, f"指輪 : {ring['name'] if ring else 'なし'}")
     
-    stdscr.addstr(7, 2, "【持ち物】")
+    stdscr.addstr(8, 2, "【持ち物】")
     if not inventory:
-        stdscr.addstr(8, 4, "何も持っていない。")
+        stdscr.addstr(9, 4, "何も持っていない。")
     else:
         # y=8 から y=17 までの10行
         for i, item in enumerate(inventory):
             if i >= 10: break 
-            stdscr.addstr(i + 8, 4, f"{i}: {item['name']}")
+            stdscr.addstr(i + 9, 4, f"{i}: {item['name']}")
 
 def draw_tutorial_screen(stdscr):
     """チュートリアル画面を描画する関数"""

@@ -15,7 +15,7 @@ player_status = {
     "Equipment": {
         "weapon": None,
         "shield": None,
-        "ring": None
+        "ring": {"name": "タキオンリング", "type": "ring", "atk_bonus": 0, "def_bonus": 0, "ability": "act_twice"}
     },
     # (例: [{"type": "POISON", "turns": 10}, {"type": "CONFUSED", "turns": 5}])
     "status_effects": [],
@@ -79,6 +79,7 @@ ITEM_TABLE = [
     # LEGEND (25F+)
     (5, 25, 99, {"name": "オリハルコンの剣", "type": "weapon", "atk_bonus": 15, "def_bonus": 3}),
     (5, 25, 99, {"name": "戦女神の盾", "type": "shield", "atk_bonus": 3, "def_bonus": 15}),
+    (1, 25, 99, {"name": "奇跡のリング", "type": "ring", "atk_bonus": 0, "def_bonus": 0, "ability": "drain"}),
     # EPIC (15F - 24F)
     (10, 15, 24, {"name": "ミスリルの剣", "type": "weapon", "atk_bonus": 12, "def_bonus": 0}),
     (10, 15, 24, {"name": "ミスリルの盾", "type": "shield", "atk_bonus": 0, "def_bonus": 12}),
@@ -120,7 +121,7 @@ ENEMY_TABLE = [
         "base_HP": 20, "base_Atk": 5, "base_Def": 3, "base_Exp": 7,
         "ability": "poison"
     }),
-    (30, 10, 19, {
+    (30, 1, 19, {
         "name": "速き者", "symbol": "F", "min_floor": 10,
         "base_HP": 25, "base_Atk": 3, "base_Def": 3, "base_Exp": 10,
         "ability": "act_twice"
