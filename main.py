@@ -6,8 +6,14 @@ from game.display import refresh_screen, clear_screen
 from game.logic import (get_movement_input, handle_input, generate_dungeon, add_log, 
                         get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, 
                         get_drop_input, get_quit_confirm_input, handle_quit_confirm_input,
-                        is_affected_by, handle_status_effects)
+                        is_affected_by, handle_status_effects, play_sound_effect)
 import pygame
+import threading
+
+try:
+    from playsound import playsound
+except ImportError:
+    playsound = None
 
 def game_loop(stdscr, dungeon_map, enemies_list, items_list):
     global player_status
@@ -46,20 +52,25 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
                 data.game_state = "playing" # ゲーム開始
         
         elif data.game_state == "playing":
+                turn_consumed_in_loop = False
                 for _ in range(num_player_actions):
                     if player_status['HP'] <= 0: break
                     action = get_movement_input(stdscr) # (get_... は stdscr が必要)
-                    is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
+                    is_running, turn_consumed = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
+
+                    if turn_consumed:
+                        turn_consumed_in_loop = True
+
 
                     if not is_running: break
                     if data.game_state != "playing": break
-                    if num_player_actions > 1:
+                    if num_player_actions > 1 and turn_consumed:
                         refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, data.game_state, is_blind_now)
 
                 if not is_running or player_status['HP'] <= 0:
                     continue
                 
-                if data.game_state == "playing":
+                if data.game_state == "playing" and turn_consumed_in_loop:
 
                     if num_enemy_actions > 1:
                         add_log("動きが鈍く、敵が連続で行動する!")
@@ -84,6 +95,12 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
         elif data.game_state == "next_floor":
             if player_status['Floor'] > 50:
                 # 50階を踏破した
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/clear.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 add_log("--- 鳳の間 50階を踏破した！ ---")
                 add_log("GAME CLEAR! おめでとう！")
                 data.game_state = "game_clear" # (新しい状態)
@@ -92,6 +109,13 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
 
             else:
                 add_log(f"--- {player_status['Floor']}階に到達 ---")
+
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/stair.wav',),
+                    daemon=True
+                )
+                se_thread.start()
 
                 # 新しいマップ、敵、アイテムを生成
                 dungeon_map, new_enemies_list, new_items_list = generate_dungeon(player_status)
@@ -157,7 +181,7 @@ def main_wrapper(stdscr):
 
     try:
         pygame.mixer.init() # 音楽エンジンを起動
-        pygame.mixer.music.load('src/runateElf.mp3') # BGMを読み込む
+        pygame.mixer.music.load('assets/dungeon.mp3') # BGMを読み込む
         pygame.mixer.music.set_volume(0.1) # ★音量を 50% に設定 (0.0 ～ 1.0)
         pygame.mixer.music.play(-1) # ★-1 で「無限ループ再生」
     except Exception as e:

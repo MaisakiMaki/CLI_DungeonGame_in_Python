@@ -30,15 +30,15 @@ def get_movement_input(stdscr):
     stdscr.addstr(26, 0, "移動(wasd)、メニュー(c)、ヘルプ(h)、終了(q)を入力      ")
     
     key_code = stdscr.getch()
-    move = ' ' # デフォルト値
+    move = None # デフォルト値
     
     try:
         move = chr(key_code)
     except Exception:
-        pass # 特殊キーは ' ' (デフォルト値) のままにする
+        move = None
         
     # --- 修正点：return を try/except の「外」に出す ---
-    return move.lower()
+    return move.lower() if move else None
 
 def is_valid_move(dungeon_map, target_x, target_y):
     # 移動先が壁じゃないかを確認する関数
@@ -119,9 +119,9 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
     target_item_data = None
     item_to_remove = None
     for item in items_list:
-        coords, data = item
+        coords, item_detales = item
         if coords == (new_x, new_y):
-            target_item_data = data
+            target_item_data = item_detales
             item_to_remove = item
             break
             
@@ -134,7 +134,7 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
             # 空きあり -> 拾う
             se_thread = threading.Thread(
                 target=play_sound_effect,
-                args=('src/Itemget.mp3',),
+                args=('assets/Itemget.mp3',),
                 daemon=True
             )
             se_thread.start()
@@ -163,10 +163,28 @@ def consume_hunger(status):
     if status["turn_counter_for_hunger"] >= 10:
         status['Hung'] = max(0, status['Hung'] - 1)
         if status['Hung'] == 50:
+            se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('assets/hung.mp3',),
+                daemon=True
+            )
+            se_thread.start()
             add_log("少しお腹が空いてきた")
         elif status['Hung'] == 20:
+            se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('assets/hung.mp3',),
+                daemon=True
+            )
+            se_thread.start()
             add_log("かなりお腹が空いてきた")
         elif status['Hung'] == 0:
+            se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('assets/hung.mp3',),
+                daemon=True
+            )
+            se_thread.start()
             add_log("空腹で倒れそうだ...")
         status["turn_counter_for_hunger"] = 0
     
@@ -179,40 +197,50 @@ def handle_input(dungeon_map, status, enemies_list, items_list, move):
             # 入力された move を、ランダムな方向に上書き
             move = random.choice(['w', 'a', 's', 'd'])
 
-    moved = False
+    turn_consumed = False
 
     # WASDの移動処理
     if move == "w": # 上移動(Yが減る)
-        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, -1)
+        turn_consumed = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, -1)
     elif move == "s": # 下移動(Yが増える)
-        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, 1)
+        turn_consumed = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, 1)
     elif move == "a": # 左移動(Xが減る)
-        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, -1, 0)
+        turn_consumed = handle_player_move(dungeon_map, status, enemies_list, items_list, -1, 0)
     elif move == "d": # 右移動(Xが増える)
-        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
+        turn_consumed = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
     elif move == "c": # メニュー表示
         # 'c'が押されたらステートをc
         # にする
         add_log("メニューを開いた")
         data.game_state = "menu"
-        moved = False
+        turn_consumed = False
     elif move == "h": # ヘルプ表示
         add_log("ヘルプを開いた。")
         data.game_state = "tutorial" # チュートリアルステートに変更
-        moved = False # ターンは消費しない
+        turn_consumed = False # ターンは消費しない
 
     elif move == "q": # 終了
         # (HPが0以下なら、確認せず即座に終了)
         if status['HP'] <= 0:
-            return False
+            return (False, False)
             
         # HPがある場合は、確認ステートへ
         add_log("本当にゲームを終了しますか？")
         data.game_state = "confirm_quit" # 新しい状態
-        moved = False
-        return True # is_running は True のまま
+        turn_consumed = False
+        return (True, False) # is_running は True のまま
+    
+    elif move == " ":
+        add_log("その場で足踏みをした")
+        turn_consumed = True
+    
+    elif move is None:
+        turn_consumed = False
+    else:
+        turn_consumed = False
+    
 
-    return True # 'q' 以外のキーは True (ゲーム続行)
+    return (True, turn_consumed) # 'q' 以外のキーは True (ゲーム続行)
 
 FLOOR_WIDTH = 40
 FLOOR_HEIGHT = 20
@@ -558,7 +586,7 @@ def combat(dungeon_map, player_status, enemies_list, items_list, enemy_x, enemy_
     
     se_thread = threading.Thread(
         target=play_sound_effect,
-        args=('src/player_attack.mp3',),
+        args=('assets/player_attack.mp3',),
         daemon=True
     )
     se_thread.start()
@@ -769,10 +797,15 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
 
             elif ability == "gun_shot" or ability == "pro_shot":
                 if check_los(dungeon_map, enemy_x, enemy_y, player_x, player_y, 3):
+                    se_thread = threading.Thread(
+                        target=play_sound_effect,
+                        args=('assets/shot_gun.mp3',),
+                        daemon=True
+                    )
+                    se_thread.start()
                     add_log(f"{enemy.get('name', '敵')}が遠距離攻撃を放った!")
                     enemy_attack_player(dungeon_map, enemy, player_status)
                     continue
-            
             
             move_x, move_y = 0, 0
 
@@ -847,6 +880,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
     
     if damage > 0:
         player_status["HP"] -= damage
+        se_thread = threading.Thread(
+            target=play_sound_effect,
+            args=('assets/enemy_attack.mp3',),
+            daemon=True
+        )
+        se_thread.start()
         add_log(f"{enemy_name}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
 
         
@@ -855,6 +894,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
         if ability == "poison" and rand_val <= 30: # 30%
             if not is_affected_by(player_status, "POISON"):
                 add_log("毒をうけた！")
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/poison.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["status_effects"].append(
                     {"type": "POISON", "turns": 10}
                 )
@@ -863,6 +908,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
         elif ability == "strong_poison" and rand_val <= 20: # 20%
              if not is_affected_by(player_status, "STRONG_POISON"):
                 add_log("猛毒をうけた！")
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/strong_poison.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["status_effects"].append(
                     {"type": "STRONG_POISON", "turns": 10}
                 )
@@ -870,6 +921,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
         elif ability == "confuse" and rand_val <= 20:
             if not is_affected_by(player_status, "CONFUSED"):
                 add_log("攻撃を受け、頭が混乱した!")
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/confuse.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["status_effects"].append(
                     {"type": "CONFUSED", "turns": 5}
                 )
@@ -877,6 +934,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
         elif ability == "paralysis" and rand_val <= 30:
             if not is_affected_by(player_status, "PARALYSIS"):
                 add_log("体が痺れてうまく動けない!")
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/paralysis.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["status_effects"].append(
                     {"type": "PARALYSIS", "turns": 10}
                 )
@@ -884,6 +947,12 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
         elif ability == "blind" and rand_val <= 30:
             if not is_affected_by(player_status, "BLIND"):
                 add_log("攻撃されて、視界が奪われた!")
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/blind.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["status_effects"].append(
                     {"type": "BLIND", "turns": 15}
                 )
@@ -893,16 +962,46 @@ def enemy_attack_player(dungeon_map, enemy, player_status):
 
             if potions:
                 item_to_burn = random.choice(potions)
+                se_thread = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/fire.mp3',),
+                    daemon=True
+                )
+                se_thread.start()
                 player_status["inventory"].remove(item_to_burn)
                 add_log(f"{item_to_burn['name']}は燃えて灰になった!")
         
-        elif ability == "rotten" and rand_val <= 25:
+        elif ability == "rotten" and rand_val <= 100:
 
             foods = [item for item in player_status["inventory"] if item.get("type") == "food"]
 
             if foods:
                 item_to_rot = random.choice(foods)
                 player_status["inventory"].remove(item_to_rot)
+                se_rotten1 = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/rotten1.mp3',),
+                    daemon=True
+                )
+                se_rotten1.start()
+                se_rotten2 = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/rotten2.waw',),
+                    daemon=True
+                )
+                se_rotten2.start()
+                se_rotten3 = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/rotten3.mp3',),
+                    daemon=True
+                )
+                se_rotten3.start()
+                se_use_item = threading.Thread(
+                    target=play_sound_effect,
+                    args=('assets/use_item.mp3',),
+                    daemon=True
+                )
+                se_use_item.start()
                 add_log(f"{item_to_rot['name']}は腐ってしまった!")
         
         elif ability == "pusher" and rand_val <= 40:
@@ -1108,7 +1207,7 @@ def drop_item(dungeon_map, player_status, items_list, item_index):
     if item_on_floor_data:
         se_thread = threading.Thread(
                 target=play_sound_effect,
-                args=('src/Itemget.mp3',),
+                args=('assets/Itemget.mp3',),
                 daemon=True
             )
         se_thread.start()
@@ -1218,6 +1317,12 @@ def use_item(player_status, item_index):
         # HP回復
         heal_amount = item_to_use["effect"]
         player_status["HP"] += heal_amount
+        se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('assets/use_item.mp3',),
+                daemon=True
+            )
+        se_thread.start()
 
         # Max_HPを超えないようにする
         if player_status["HP"] > player_status["Max_HP"]:
@@ -1237,6 +1342,12 @@ def use_item(player_status, item_index):
             return False
         
         player_status["Hung"] = min(player_status["Max_Hung"], player_status["Hung"] + recover_amount)
+        se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('assets/use_item.mp3',),
+                daemon=True
+            )
+        se_thread.start()
         add_log(f"{item_to_use['name']} を食べた! 空腹度が {recover_amount} 回復した!")
 
         inventory.pop(item_index)
@@ -1278,7 +1389,7 @@ def equip_item(player_status, item_index):
     
     se_thread = threading.Thread(
         target=play_sound_effect,
-        args=('src/equip.mp3',),
+        args=('assets/equip.mp3',),
         daemon=True
     )
     se_thread.start()
@@ -1334,7 +1445,7 @@ def level_up(player_status):
     if player_status["Lv"] != Max_level:
         se_thread = threading.Thread(
             target=play_sound_effect,
-            args=('src/level.wav',),
+            args=('assets/level.wav',),
             daemon=True
         )
         se_thread.start()

@@ -107,22 +107,25 @@ def draw_tutorial_screen(stdscr):
     stdscr.addstr(3, 5, "ようこそ、鳳の間に。")
     
     stdscr.addstr(6, 7, "--- 操作方法 ---")
-    stdscr.addstr(8, 7, "--- プレイ画面中 ---")
-    stdscr.addstr(9, 7, "w, a, s, d : 移動/攻撃")
-    stdscr.addstr(10, 7, "c           : メニュー (アイテム使用 / 装備)")
-    stdscr.addstr(11, 7, "q           : ゲーム終了")
+    stdscr.addstr(8, 7, "--- プレイ画面中(キーボード) ---")
+    stdscr.addstr(9, 7, "w, a, s, d  : 移動/攻撃")
+    stdscr.addstr(10, 7, "space       : 足踏み")
+    stdscr.addstr(11, 7, "c           : メニュー (アイテム使用/装備, アイテム廃棄)")
+    stdscr.addstr(12, 7, "q           : ゲーム終了")
     
-    stdscr.addstr(13, 7, "@ : あなた")
-    stdscr.addstr(14, 7, "A to Z : 敵")
-    stdscr.addstr(15, 7, "! : アイテム")
-    stdscr.addstr(16, 7, "< : 階段")
+    stdscr.addstr(14, 7, "--- プレイ画面中(マップ表示) ---")
+    stdscr.addstr(15, 7, "@           : あなた")
+    stdscr.addstr(16, 7, "A ~ Z       : 敵")
+    stdscr.addstr(17, 7, "!           : アイテム")
+    stdscr.addstr(18, 7, "<           : 階段")
 
 
-    stdscr.addstr(18, 7, "--- メニュー画面中 ---")
-    stdscr.addstr(19, 7, "0 to 9 : アイテム選択")
-    stdscr.addstr(20, 7, "d : アイテムを捨てる/床のアイテムと交換")
+    stdscr.addstr(20, 7, "--- メニュー画面中(キー操作) ---")
+    stdscr.addstr(21, 7, "0 ~ 9       : アイテム選択")
+    stdscr.addstr(22, 7, "x           : メニュー画面の終了")
+    stdscr.addstr(23, 7, "d           : アイテムを捨てる/床のアイテムと交換")
     
-    stdscr.addstr(23, 5, "【Enterキー】を押してゲームを開始します...")
+    stdscr.addstr(26, 5, "【Enterキー】を押してゲームを開始します...")
 
 def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state, is_blind):
     # 画面全体を更新する関数
