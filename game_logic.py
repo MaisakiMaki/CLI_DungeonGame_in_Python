@@ -1,7 +1,7 @@
 import curses
 import random
 import game_data
-from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE, ITEM_TABLE, ENEMY_TABLE
+from game_data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE, ITEM_TABLE, ENEMY_TABLE, ITEM_TABLE
 import threading
 
 try:
@@ -100,7 +100,7 @@ def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
     if target_enemy:
         # 敵がいた -> 攻撃
         add_log("敵に攻撃!")
-        combat(dungeon_map, status, enemies_list, new_x, new_y)
+        combat(dungeon_map, status, enemies_list, items_list, new_x, new_y)
         return True # 行動終了 (移動しない)
 
     # 2. 移動先が「壁」か？ (dungeon_map をチェック)
@@ -500,7 +500,51 @@ def place_items(dungeon_map, room, items_list, current_floor):
                 items_list.append(((item_x, item_y), new_item))
                 break
 
-def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
+def find_available_drop_spot(x, y, dungeon_map, items_list, player_status):
+    """
+    指定された座標 (x, y) の周囲1マス (自分自身も含む) で、
+    「壁」でなく、「アイテム」もない「空き地」を探す関数
+    """
+
+    player_x, player_y = player_status["X"], player_status["Y"]
+    
+    # 1. チェックする座標のリスト (優先順位：真下 -> 真上 -> 左右 -> 斜め)
+    #    (0,0) (真下) が一番優先度が高い
+    coords_to_check = [
+        (x, y),     # 1. 敵が死んだ、まさにその場所
+        (x, y + 1), (x, y - 1), (x - 1, y), (x + 1, y), # 2. 上下左右
+        (x - 1, y + 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1) # 3. 斜め
+    ]
+
+    for (cx, cy) in coords_to_check:
+        
+        # チェック1: そもそもマップの範囲内か？
+        if not (0 <= cy < FLOOR_HEIGHT and 0 <= cx < FLOOR_WIDTH):
+            continue
+
+        # チェック2: そこは「壁」か？
+        if dungeon_map[cy][cx] == MAP_SYMBOLS["WALL"]:
+            continue
+            
+        # チェック3: そこに「既にアイテム」がないか？
+        is_occupied = False
+        for (item_x, item_y), _ in items_list:
+            if (item_x, item_y) == (cx, cy):
+                is_occupied = True
+                break
+        
+        if is_occupied:
+            continue
+
+        if (cx, cy) == (player_x, player_y):
+            continue
+            
+        return (cx, cy)
+        
+    # 4. 8マス探しても空き地がなかった (壁に囲まれていた)
+    return None
+
+def combat(dungeon_map, player_status, enemies_list, items_list, enemy_x, enemy_y):
     # プレイヤーの攻撃処理を行う関数
 
     target_enemy = None
@@ -566,8 +610,39 @@ def combat(dungeon_map, player_status, enemies_list, enemy_x, enemy_y):
         add_log(f"{enemy_name}を倒した!")
         enemy_exp = target_enemy.get("Exp", 1)
         gain_experience(player_status, enemy_exp)
-        # マップから 'E' を消して床 '.' にする
-        # 敵のリストから削除する
+
+        drop_item_name = None
+        drop_chance = random.randint(1, 100)
+
+        if enemy_name == "Ain":
+            drop_item_name = "始まりの盾"
+        elif enemy_name == "ゴブリン":
+            drop_item_name = "終わりの剣"
+        elif enemy_name == "ベールに覆われしオーロラ":
+            if drop_chance <= 30:
+                drop_item_name = "オーロラの指輪"
+        elif enemy_name == "光より速きタキオン":
+            if drop_chance <= 30:
+                drop_item_name == "タキオンリング"
+        
+        if drop_item_name:
+            item_data_to_drop = None
+            for (prob, min_f, max_f, item_data) in ITEM_TABLE:
+                if item_data.get("name") == drop_item_name:
+                    item_data_to_drop = item_data.copy()
+                    break
+        
+        if item_data_to_drop:
+            drop_spot = find_available_drop_spot(enemy_x, enemy_y, dungeon_map, items_list, player_status)
+                
+            if drop_spot:
+                items_list.append(((drop_spot), item_data_to_drop))
+                add_log(f"足元に {drop_item_name} が落ちた！")
+            else:
+                # (周囲8マスがすべて壁やアイテムで埋まっていた場合)
+                add_log(f"{drop_item_name} が落ちたが、置く場所がなかった！")
+
+            
         enemies_list.remove(target_enemy)
 
 def enemy_turn(dungeon_map, player_status, enemies_list):
@@ -576,7 +651,7 @@ def enemy_turn(dungeon_map, player_status, enemies_list):
     """
     
     # 1. プレイヤーのターン終了処理 (毒、空腹など)
-    handle_status_effects(player_status) 
+    handle_status_effects(player_status)
     consume_hunger(player_status)
     
     # 2. 敵の行動処理

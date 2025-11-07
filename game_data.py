@@ -14,7 +14,8 @@ player_status = {
 
     "Equipment": {
         "weapon": None,
-        "shield": None
+        "shield": None,
+        "ring": None
     },
     # (例: [{"type": "POISON", "turns": 10}, {"type": "CONFUSED", "turns": 5}])
     "status_effects": [],
@@ -69,6 +70,12 @@ LEVEL_UP_TABLE ={
 
 # アイテムのマスターテーブル (重み, 最小階層, 最大階層, アイテムデータ)
 ITEM_TABLE = [
+    # BOSSDROP
+    (0, 0, 0, {"name": "終わりの剣", "type": "weapon", "atk_bonus": 20, "def_bonus": 5}),
+    (0, 0, 0, {"name": "始まりの盾", "type": "shield", "atk_bonus": 5, "def_bonus": 20}),
+    (0, 0, 0, {"name": "オーロラの指輪", "type": "ring", "atk_bonus": 0, "def_bonus": 0, "ability": "aurora_veil"}),
+    (0, 0, 0, {"name": "タキオンリング", "type": "ring", "atk_bonus": 0, "def_bonus": 0, "ability": "act_twice"}),
+
     # LEGEND (25F+)
     (5, 25, 99, {"name": "オリハルコンの剣", "type": "weapon", "atk_bonus": 15, "def_bonus": 3}),
     (5, 25, 99, {"name": "戦女神の盾", "type": "shield", "atk_bonus": 3, "def_bonus": 15}),
@@ -96,7 +103,7 @@ ENEMY_TABLE = [
     (50, 1, 14, {
         "name": "ゴブリン", "symbol": "G", "min_floor": 1,
         "base_HP": 10, "base_Atk": 5, "base_Def": 2, "base_Exp": 5,
-        "ability": "reverse"
+        "ability": "none"
     }),
     (50, 5, 29, {
         "name": "スライム", "symbol": "S", "min_floor": 5,
