@@ -5,7 +5,8 @@ from display import refresh_screen, clear_screen
 
 from game_logic import (get_movement_input, handle_input, generate_dungeon, add_log, 
                         get_menu_input, handle_menu_input, enemy_turn, handle_drop_input, 
-                        get_drop_input, get_quit_confirm_input, handle_quit_confirm_input)
+                        get_drop_input, get_quit_confirm_input, handle_quit_confirm_input,
+                        is_affected_by, handle_status_effects)
 import pygame
 
 def game_loop(stdscr, dungeon_map, enemies_list, items_list):
@@ -14,9 +15,11 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
     is_running = True
 
     while is_running:
+
+        is_blind_now = is_affected_by(player_status, "BLIND")
         
         # 2. 最新の状態を描画 (これは stdscr が必要なので OK)
-        refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state)
+        refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state, is_blind_now)
 
         # 3. ゲームの状態によって処理を分岐
         if game_data.game_state == "tutorial":
@@ -26,8 +29,8 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
                 game_data.game_state = "playing" # ゲーム開始
         
         elif game_data.game_state == "playing":
-            action = get_movement_input(stdscr) # (get_... は stdscr が必要)
-            is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
+                action = get_movement_input(stdscr) # (get_... は stdscr が必要)
+                is_running = handle_input(dungeon_map, player_status, enemies_list, items_list, action)
         
         elif game_data.game_state == "menu":
             action = get_menu_input(stdscr) # (get_... は stdscr が必要)
@@ -74,7 +77,8 @@ def game_loop(stdscr, dungeon_map, enemies_list, items_list):
             add_log("【Enterキー】を押すと終了します...")
         
         # (最終画面を描画)
-            refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state)
+            is_blind_now = is_affected_by(player_status, "BLIND")
+            refresh_screen(stdscr, dungeon_map, player_status, enemies_list, items_list, game_log, game_data.game_state, is_blind_now)
 
         # --- 修正点：ここから ---
         # 「何かキー」ではなく、「Enterキー」だけを待つ
@@ -108,7 +112,7 @@ def main_wrapper(stdscr):
     try:
         pygame.mixer.init() # 音楽エンジンを起動
         pygame.mixer.music.load('src/runateElf.mp3') # BGMを読み込む
-        pygame.mixer.music.set_volume(0.5) # ★音量を 50% に設定 (0.0 ～ 1.0)
+        pygame.mixer.music.set_volume(0.1) # ★音量を 50% に設定 (0.0 ～ 1.0)
         pygame.mixer.music.play(-1) # ★-1 で「無限ループ再生」
     except Exception as e:
         add_log(f"BGMエラー: {e}")

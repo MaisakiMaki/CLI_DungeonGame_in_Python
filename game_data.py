@@ -96,7 +96,7 @@ ENEMY_TABLE = [
     (50, 1, 14, {
         "name": "ゴブリン", "symbol": "G", "min_floor": 1,
         "base_HP": 10, "base_Atk": 5, "base_Def": 2, "base_Exp": 5,
-        "ability": "none"
+        "ability": "reverse"
     }),
     (50, 5, 29, {
         "name": "スライム", "symbol": "S", "min_floor": 5,
@@ -185,7 +185,7 @@ ENEMY_TABLE = [
     (20, 30, 39, {
         "name": "月うさぎ", "symbol": "M", "min_floor": 30,
         "base_HP": 10, "base_Atk": 40, "base_Def": 5, "base_Exp": 40,
-        "ability": "gun_attack"
+        "ability": "gun_shot"
     }),
     (15, 30, 50, {
         "name": "ウラン鉱石虫", "symbol": "U", "min_floor": 30,
@@ -203,14 +203,14 @@ ENEMY_TABLE = [
     (10, 40, 50, {
         "name": "玉兎ルナ", "symbol": "L", "min_floor": 40,
         "base_HP": 45, "base_Atk": 45, "base_Def": 5, "base_Exp": 50,
-        "ability": "gun_attack"
+        "ability": "pro_shoot"
     }),
     (10, 40, 50, {
         "name": "光より速きタキオン", "symbol": "T", "min_floor": 40,
         "base_HP": 50, "base_Atk": 30, "base_Def": 20, "base_Exp": 60,
         "ability": "act_twice"
     }),
-    (10, 40, 50, {
+    (5, 40, 50, {
         "name": "ベールに覆われしオーロラ", "symbol": "V", "min_floor": 40,
         "base_HP": 60, "base_Atk": 25, "base_Def": 30, "base_Exp": 60,
         "ability": "aurora_veil"
@@ -218,9 +218,9 @@ ENEMY_TABLE = [
     (10, 40, 50, {
         "name": "未確認生物ゼノイド", "symbol": "X", "min_floor": 40,
         "base_HP": 75, "base_Atk": 35, "base_Def": 40, "base_Exp": 70,
-        "ability": "none"
+        "ability": "split"
     }),
-    (10, 40, 50, {
+    (5, 40, 50, {
         "name": "陰陽", "symbol": "Y", "min_floor": 40,
         "base_HP": 60, "base_Atk": 35, "base_Def": 35, "base_Exp": 70,
         "ability": "reverse"

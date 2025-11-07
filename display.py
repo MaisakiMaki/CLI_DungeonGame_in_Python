@@ -121,7 +121,7 @@ def draw_tutorial_screen(stdscr):
     
     stdscr.addstr(23, 5, "【Enterキー】を押してゲームを開始します...")
 
-def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state):
+def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_log, game_state, is_blind):
     # 画面全体を更新する関数
     
     # 1. HPに基づいて「全体の文字色」を決定
@@ -177,6 +177,26 @@ def refresh_screen(stdscr, dungeon_map, status, enemies_list, items_list, game_l
     try:
         if color_pair_num != 0:
             stdscr.attroff(curses.color_pair(color_pair_num))
+    except curses.error:
+        pass
+
+    try:
+        stdscr.attroff(curses.A_COLOR)
+    except:
+        pass
+
+    try:
+        if is_blind and game_state not in ["menu", "drop_menu", "tutorial"]:
+            px, py = status['X'], status['Y']
+
+            for y in range(1, 22):
+                for x in range(0, 40):
+
+                    is_visible = abs(x - px) <= 2 and abs(y - (py + 1)) <= 2
+
+                    if not is_visible:
+                        stdscr.addstr(y, x, ' ')
+
     except curses.error:
         pass
 
