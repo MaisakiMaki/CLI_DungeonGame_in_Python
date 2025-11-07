@@ -1,0 +1,1417 @@
+import curses
+import random
+import game.data as data
+from game.data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE, ITEM_TABLE, ENEMY_TABLE, ITEM_TABLE
+import threading
+
+try:
+    from playsound import playsound
+except ImportError:
+    playsound = None
+
+def add_log(message):
+    #ゲームログに新しいメッセージを追加する関数
+    game_log.append(message)
+    if len(game_log) > 50:
+        game_log.pop
+
+def play_sound_effect(sound_file):
+    """SE再生を「別スレッド」で実行する関数"""
+    if not playsound:
+        return
+    try:
+        playsound(sound_file)
+    except Exception as e:
+        # (SE再生失敗は、ログにも出さず、握りつぶすのが吉)
+        pass
+
+def get_movement_input(stdscr):
+    # curses でプレイヤーの入力を受け付ける
+    stdscr.addstr(26, 0, "移動(wasd)、メニュー(c)、ヘルプ(h)、終了(q)を入力      ")
+    
+    key_code = stdscr.getch()
+    move = ' ' # デフォルト値
+    
+    try:
+        move = chr(key_code)
+    except Exception:
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
+        
+    # --- 修正点：return を try/except の「外」に出す ---
+    return move.lower()
+
+def is_valid_move(dungeon_map, target_x, target_y):
+    # 移動先が壁じゃないかを確認する関数
+
+    # マップの範囲外チェック
+    if not (0 <= target_y < len(dungeon_map) and 0 <= target_x < len(dungeon_map[0])):
+        return False
+    
+    # 移動先が壁じゃないかをチェックする
+    if dungeon_map[target_y][target_x] == MAP_SYMBOLS["WALL"]:
+        add_log("壁に阻まれた...")
+        return False
+    
+    # あとでアイテムなどの追加
+    return True
+
+def check_los(dungeon_map, x1, y1, x2, y2, max_range):
+    #直線の車線が通ってるかチェックする関数
+
+    if x1 != x2 and y1 != y2:
+        return False
+    
+    if x1 == x2:
+        dist = abs(y1 - y2)
+        if dist > max_range:
+            return False
+        
+        step = 1 if y1 < y2 else -1
+        for y in range(y1 + step, y2, step):
+            if dungeon_map[y][x1] == MAP_SYMBOLS["WALL"]:
+                return False
+    
+    elif y1 == y2:
+        dist = abs(x1 - x2)
+        if dist > max_range:
+            return False
+        
+        step = 1 if x1 < x2 else -1
+        for x in range(x1 + step, x2, step):
+            if dungeon_map[y1][x] == MAP_SYMBOLS["WALL"]:
+                return False
+    
+    return True
+
+def handle_player_move(dungeon_map, status, enemies_list, items_list, dx, dy):
+    #プレイヤーの移動とマップの更新を行う関数
+    current_x, current_y = status['X'], status['Y']
+    new_x, new_y = current_x + dx , current_y + dy
+
+    # --- 修正点：ここから丸ごと置き換え ---
+
+    # 1. 移動先が「敵」か？ (enemies_list を直接チェック)
+    target_enemy = None
+    for enemy in enemies_list:
+        if enemy["X"] == new_x and enemy["Y"] == new_y:
+            target_enemy = enemy
+            break
+            
+    if target_enemy:
+        # 敵がいた -> 攻撃
+        add_log("敵に攻撃!")
+        combat(dungeon_map, status, enemies_list, items_list, new_x, new_y)
+        return True # 行動終了 (移動しない)
+
+    # 2. 移動先が「壁」か？ (dungeon_map をチェック)
+    if not is_valid_move(dungeon_map, new_x, new_y):
+        return False # 行動失敗 (移動しない)
+    
+    # 3. 移動先が「階段」か？ (dungeon_map をチェック)
+    target_tile = dungeon_map[new_y][new_x]
+    if target_tile == MAP_SYMBOLS["STAIRS"]:
+        add_log("階段を見つけた! 次の階層へ進む...")
+        status["Floor"] += 1
+        data.game_state = "next_floor"
+        return True
+
+    # 4. 移動先が「アイテム」か？ (items_list を直接チェック)
+    target_item_data = None
+    item_to_remove = None
+    for item in items_list:
+        coords, data = item
+        if coords == (new_x, new_y):
+            target_item_data = data
+            item_to_remove = item
+            break
+            
+    if target_item_data:
+        # アイテムが見つかった
+        if len(status["inventory"]) >= MAX_INVENTORY_SIZE:
+            # 満タン
+            add_log(f"持ち物がいっぱいで、{target_item_data['name']} の上に乗った。")
+        else:
+            # 空きあり -> 拾う
+            se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('src/Itemget.mp3',),
+                daemon=True
+            )
+            se_thread.start()
+            status["inventory"].append(target_item_data)
+            items_list.remove(item_to_remove) # データから削除
+            add_log(f"{target_item_data['name']} を拾った!")
+            # (dungeon_map の '!' は元から無いので、消す必要もない)
+
+    # 5. 何も無かった (or アイテムの上に乗った) -> 移動
+    status['X'], status['Y'] = new_x, new_y
+    return True # 移動成功
+    # --- 修正点：ここまで ---
+
+def consume_hunger(status):
+    # 空腹度を計算する関数
+    if status['Hung'] > 0:
+
+        is_poisoned = is_affected_by(status, "POISON") or is_affected_by(status, "STRONG_POISON")
+        if status["HP"] < status["Max_HP"] and not is_poisoned:
+            status["HP"] += 1
+    else:
+        status['HP'] -= 1
+
+    status["turn_counter_for_hunger"] += 1
+
+    if status["turn_counter_for_hunger"] >= 10:
+        status['Hung'] = max(0, status['Hung'] - 1)
+        if status['Hung'] == 50:
+            add_log("少しお腹が空いてきた")
+        elif status['Hung'] == 20:
+            add_log("かなりお腹が空いてきた")
+        elif status['Hung'] == 0:
+            add_log("空腹で倒れそうだ...")
+        status["turn_counter_for_hunger"] = 0
+    
+def handle_input(dungeon_map, status, enemies_list, items_list, move):
+    #入力に応じた処理を呼び出す関数
+
+    if is_affected_by(status, "CONFUSED"):
+        if move in ['w', 'a', 's', 'd']:
+            add_log("混乱していて、あらぬ方向に動いた！")
+            # 入力された move を、ランダムな方向に上書き
+            move = random.choice(['w', 'a', 's', 'd'])
+
+    moved = False
+
+    # WASDの移動処理
+    if move == "w": # 上移動(Yが減る)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, -1)
+    elif move == "s": # 下移動(Yが増える)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 0, 1)
+    elif move == "a": # 左移動(Xが減る)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, -1, 0)
+    elif move == "d": # 右移動(Xが増える)
+        moved = handle_player_move(dungeon_map, status, enemies_list, items_list, 1, 0)
+    elif move == "c": # メニュー表示
+        # 'c'が押されたらステートをc
+        # にする
+        add_log("メニューを開いた")
+        data.game_state = "menu"
+        moved = False
+    elif move == "h": # ヘルプ表示
+        add_log("ヘルプを開いた。")
+        data.game_state = "tutorial" # チュートリアルステートに変更
+        moved = False # ターンは消費しない
+
+    elif move == "q": # 終了
+        # (HPが0以下なら、確認せず即座に終了)
+        if status['HP'] <= 0:
+            return False
+            
+        # HPがある場合は、確認ステートへ
+        add_log("本当にゲームを終了しますか？")
+        data.game_state = "confirm_quit" # 新しい状態
+        moved = False
+        return True # is_running は True のまま
+
+    return True # 'q' 以外のキーは True (ゲーム続行)
+
+FLOOR_WIDTH = 40
+FLOOR_HEIGHT = 20
+MAX_ROOMS = 10
+MAX_ROOMS_TRIES = 50
+MAX_ENEMIES_PER_ROOM = 2
+MAX_ITEM_PER_ROOM = 2
+SIGHT_RANGE = 8
+MAX_INVENTORY_SIZE = 10
+MAX_ENEMIES_TOTAL = 50
+SPRIT_CHANCE = 20
+
+def create_empty_floor(width, height):
+    # 全体が壁のからのフロア(二次元リスト)を作成する関数
+
+    return [[MAP_SYMBOLS["WALL"] for _ in range(width)] for _ in range(height)]
+
+def create_room(dungeon_map, x, y, w, h):
+    # 指定された座標に部屋を生成する関数
+    for i in range(y, y + h):
+        for j in range(x, x + w):
+            if 0 < i < FLOOR_HEIGHT - 1 and 0 < j < FLOOR_WIDTH -1:
+                dungeon_map[i][j] = MAP_SYMBOLS["FLOOR"]
+    
+    center_x = x + w // 2
+    center_y = y + h // 2
+    return {'x': x, 'y': y, 'w': w, 'h': h, 'center': (center_x, center_y)}
+
+def connect_rooms(dungeon_map, start_point, end_point):
+    # 2点をL字型の通路で繋ぐ関数
+    x1, y1 = start_point
+    x2, y2 = end_point  # <--- 修正①：終点(end_point) を使う
+
+    # 1. X方向の通路を掘る (y1 の高さで)
+    for x in range(min(x1, x2), max(x1, x2) + 1):
+        # マップの端(0と最後)は壁のまま残したいので、 1 から (WIDTH-2) の範囲を掘る
+        if 1 <= x < FLOOR_WIDTH - 1 and 1 <= y1 < FLOOR_HEIGHT - 1:
+            dungeon_map[y1][x] = MAP_SYMBOLS["FLOOR"]
+    
+    # 2. Y方向の通路を掘る (x2 の位置で)
+    for y in range(min(y1, y2), max(y1, y2) + 1):
+         # マップの端(0と最後)は壁のまま残したいので、 1 から (HEIGHT-2) の範囲を掘る
+        if 1 <= x2 < FLOOR_WIDTH - 1 and 1 <= y < FLOOR_HEIGHT - 1: # <--- 修正②： y を使う
+            dungeon_map[y][x2] = MAP_SYMBOLS["FLOOR"]
+
+def check_room_overlap(new_room_coords, existing_rooms):
+    """
+    新しい部屋の座標が、既存の部屋リストと重なっていないかチェックする関数
+    (x1, y1, w1, h1) は新しい部屋の座標とサイズ
+    """
+    x1, y1, w1, h1 = new_room_coords
+    
+    # 既存の各部屋(room)と重なりをチェック
+    for room in existing_rooms:
+        x2, y2, w2, h2 = room['x'], room['y'], room['w'], room['h']
+        
+        # AABB 衝突判定ロジック
+        # (わしは、部屋同士が壁1枚で隣接するのも防ぐため、
+        #  判定に「+1」のマージン（余白）を持たせておる)
+        
+        # --- 修正点： < を > に変更 ---
+        if (x1 < x2 + w2 + 1 and x1 + w1 + 1 > x2 and
+            y1 < y2 + h2 + 1 and y1 + h1 + 1 > y2):
+        # --- 修正点：ここまで ---
+            return True # 重なっている
+            
+    return False # 重なっていない
+
+def generate_dungeon(status):
+    # ダンジョンマップ全体を生成するメイン関数 敵リストも追加
+
+    dungeon_map = create_empty_floor(FLOOR_WIDTH, FLOOR_HEIGHT)
+    rooms = [] 
+    new_enemies_list = []
+    new_item_list = []
+    
+    current_floor = status["Floor"]
+
+    # --- 修正点：ここから ---
+    
+    # 1. まず「部屋」と「通路」だけを先に全部作る
+    for _ in range(MAX_ROOMS_TRIES): 
+        room_w = random.randint(5, 12)
+        room_h = random.randint(4, 9)
+        room_x = random.randint(1, FLOOR_WIDTH - room_w - 1)
+        room_y = random.randint(1, FLOOR_HEIGHT - room_h - 1)
+
+        new_coords = (room_x, room_y, room_w, room_h)
+        if check_room_overlap(new_coords, rooms):
+            continue 
+        
+        new_room = create_room(dungeon_map, room_x, room_y, room_w, room_h)
+        rooms.append(new_room)
+        
+        if len(rooms) > 1:
+            # 1個前の部屋と、今作った部屋を繋ぐ
+            prev_center = rooms[-2]['center'] 
+            current_center = new_room['center']
+            connect_rooms(dungeon_map, prev_center, current_center)
+            
+        if len(rooms) >= MAX_ROOMS:
+            break
+            
+    # --- 修正点：ここまで ---
+
+    if rooms:
+        # 2. プレイヤーを「最初の部屋」に配置
+        start_room = rooms[0]
+        start_x, start_y = start_room['center']
+        status["X"], status["Y"] = start_x, start_y
+
+        # 3. (重要) 階段を「最後の部屋」に先に置く
+        end_room = rooms[-1]
+        end_x, end_y = end_room['center']
+        
+        if start_room == end_room: 
+            # (部屋が1つしかない場合の安全処理はそのまま)
+            stair_x = end_room['x'] + 1 
+            stair_y = end_room['y'] + 1
+            if (stair_x, stair_y) == (start_x, start_y):
+                stair_x += 1 
+            
+            if dungeon_map[stair_y][stair_x] == MAP_SYMBOLS["FLOOR"]:
+                dungeon_map[stair_y][stair_x] = MAP_SYMBOLS["STAIRS"]
+            else:
+                 dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+        else:
+            dungeon_map[end_y][end_x] = MAP_SYMBOLS["STAIRS"]
+            
+        # --- 修正点：ここから ---
+        # 4. 「その後で」敵とアイテムを配置する
+        #    (最初の部屋 rooms[0] には置かない)
+        for room in rooms[1:]:
+            place_enemies(dungeon_map, room, new_enemies_list, current_floor)
+            place_items(dungeon_map, room, new_item_list, current_floor)
+        # --- 修正点：ここまで ---
+
+    else:
+         add_log("エラー：部屋が生成されませんでした。")
+    
+    return dungeon_map, new_enemies_list, new_item_list
+
+def place_enemies(dungeon_map, room, enemies_list, current_floor):
+    # 部屋の中にランダムに敵を配置する関数
+    num_enemies = random.randint(0, MAX_ENEMIES_PER_ROOM)
+
+    # 1. この階層で「出現候補」になる敵リストを作る
+    available_enemies = []
+    total_weight = 0
+    # (import した ENEMY_TABLE を使う)
+    for (prob, min_floor, max_floor, template) in ENEMY_TABLE:
+        if min_floor <= current_floor <= max_floor:
+            available_enemies.append((prob, template))
+            total_weight += prob 
+
+    if total_weight == 0:
+        return # この階層に出る敵がいない
+
+    # 2. 敵を配置するループ
+    for _ in range(num_enemies):
+        for _ in range(100): # 100回試行
+            enemy_x = random.randint(room['x'], room['x'] + room["w"] - 1)
+            enemy_y = random.randint(room['y'], room['y'] + room['h'] - 1)
+
+            if dungeon_map[enemy_y][enemy_x] == MAP_SYMBOLS["FLOOR"]:
+                
+                # --- 修正点：ここから ---
+                
+                # 3. 候補リストから、重みに応じて1体選ぶ
+                enemy_template = None
+                if total_weight > 0:
+                    item_roll = random.randint(1, total_weight)
+                    cumulative_prob = 0
+                    for (prob, template) in available_enemies:
+                        cumulative_prob += prob
+                        if item_roll <= cumulative_prob:
+                            enemy_template = template.copy()
+                            break
+                
+                if enemy_template is None:
+                    continue 
+
+                # 4. (重要) AIN と Zenith は、ボーナス計算から「除外」する
+                if enemy_template["name"] in ["AIN", "Zenith"]:
+                    new_enemy = {
+                        "name": enemy_template["name"],
+                        "symbol": enemy_template["symbol"],
+                        "HP": enemy_template["base_HP"],
+                        "Max_HP": enemy_template["base_HP"],
+                        "Atk": enemy_template["base_Atk"],
+                        "Def": enemy_template["base_Def"],
+                        "Exp": enemy_template["base_Exp"],
+                        "X": enemy_x,
+                        "Y": enemy_y,
+                        "standing_on": MAP_SYMBOLS["FLOOR"]
+                    }
+                
+                else:
+                    # 5. それ以外の敵は、ボーナスを計算する
+                    
+                    # (君のアイディア) 
+                    # 「現在の階層」-「出現開始階層」= ボーナス階層
+                    min_floor = enemy_template.get("min_floor", current_floor)
+                    bonus_levels = max(0, current_floor - min_floor)
+                    
+                    # (例: 10階層のボーナスで、強さが 50% (0.5) 増える)
+                    floor_multiplier = 1.0 + (bonus_levels / 20.0)
+
+                    final_hp = round(enemy_template["base_HP"] * floor_multiplier)
+    
+                    new_enemy = {
+                        "name": enemy_template["name"],
+                        "symbol": enemy_template["symbol"],
+                        "HP": final_hp,
+                        "Max_HP": final_hp,
+                        "Atk": round(enemy_template["base_Atk"] * floor_multiplier),
+                        "Def": round(enemy_template["base_Def"] * floor_multiplier),
+                        "Exp": enemy_template["base_Exp"] + bonus_levels, 
+                        "X": enemy_x,
+                        "Y": enemy_y,
+                        "standing_on": MAP_SYMBOLS["FLOOR"],
+                        "ability": enemy_template.get("ability", None)
+                    }
+                # --- 修正点：ここまで ---
+
+                enemies_list.append(new_enemy)
+                break
+
+def place_items(dungeon_map, room, items_list, current_floor):
+    # 部屋の中にランダムにアイテムを配置する関数
+
+    num_items = random.randint(0, MAX_ITEM_PER_ROOM)
+
+    for _ in range(num_items):
+        for _ in range(100):
+            item_x = random.randint(room['x'], room['x'] + room['w'] - 1)
+            item_y = random.randint(room['y'], room['y'] + room['h'] - 1)
+
+            if dungeon_map[item_y][item_x] == MAP_SYMBOLS["FLOOR"]:
+                is_occupied = False
+
+                for(existing_x, existing_y), _ in items_list:
+                    if (existing_x, existing_y) == (item_x, item_y):
+                        is_occupied = True
+                        break
+                
+                if is_occupied:
+                    continue
+
+                # --- 修正点：ここから丸ごと置き換え ---
+                
+                new_item = None
+                
+                # 1. アイテムのマスターテーブル (確率は「重み」として使う)
+                # (重み, 最小階層, 最大階層, アイテムデータ)
+
+                # 2. この階層で「出現候補」になるアイテムリストを作る
+                available_items = []
+                total_weight = 0
+                for (prob, min_floor, max_floor, item_data) in ITEM_TABLE:
+                    if min_floor <= current_floor <= max_floor:
+                        available_items.append((prob, item_data))
+                        total_weight += prob # 重みを合計
+
+                # 3. 候補リストから、重みに応じて1つ選ぶ
+                if total_weight > 0:
+                    item_roll = random.randint(1, total_weight)
+                    cumulative_prob = 0
+                    
+                    for (prob, item_data) in available_items:
+                        cumulative_prob += prob
+                        if item_roll <= cumulative_prob:
+                            new_item = item_data.copy()
+                            break
+                
+                # 4. 万が一、候補が0だった場合 (テーブル設定ミスの保険)
+                if new_item is None:
+                    new_item = {"name": "薬草", "type": "potion", "effect": 10}
+                
+                # --- 修正点：ここまで ---
+
+                items_list.append(((item_x, item_y), new_item))
+                break
+
+def find_available_drop_spot(x, y, dungeon_map, items_list, player_status):
+    """
+    指定された座標 (x, y) の周囲1マス (自分自身も含む) で、
+    「壁」でなく、「アイテム」もない「空き地」を探す関数
+    """
+
+    player_x, player_y = player_status["X"], player_status["Y"]
+    
+    # 1. チェックする座標のリスト (優先順位：真下 -> 真上 -> 左右 -> 斜め)
+    #    (0,0) (真下) が一番優先度が高い
+    coords_to_check = [
+        (x, y),     # 1. 敵が死んだ、まさにその場所
+        (x, y + 1), (x, y - 1), (x - 1, y), (x + 1, y), # 2. 上下左右
+        (x - 1, y + 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1) # 3. 斜め
+    ]
+
+    for (cx, cy) in coords_to_check:
+        
+        # チェック1: そもそもマップの範囲内か？
+        if not (0 <= cy < FLOOR_HEIGHT and 0 <= cx < FLOOR_WIDTH):
+            continue
+
+        # チェック2: そこは「壁」か？
+        if dungeon_map[cy][cx] == MAP_SYMBOLS["WALL"]:
+            continue
+            
+        # チェック3: そこに「既にアイテム」がないか？
+        is_occupied = False
+        for (item_x, item_y), _ in items_list:
+            if (item_x, item_y) == (cx, cy):
+                is_occupied = True
+                break
+        
+        if is_occupied:
+            continue
+
+        if (cx, cy) == (player_x, player_y):
+            continue
+            
+        return (cx, cy)
+        
+    # 4. 8マス探しても空き地がなかった (壁に囲まれていた)
+    return None
+
+def combat(dungeon_map, player_status, enemies_list, items_list, enemy_x, enemy_y):
+    # プレイヤーの攻撃処理を行う関数
+
+    target_enemy = None
+    
+    # 座標から、攻撃対象の敵オブジェクトを探す
+    for enemy in enemies_list:
+        if enemy["X"] == enemy_x and enemy["Y"] == enemy_y:
+            target_enemy = enemy
+            break
+    
+    if target_enemy is None:
+        add_log("エラー：見えない敵を攻撃してるね？旅人さん？")
+        return
+    
+    se_thread = threading.Thread(
+        target=play_sound_effect,
+        args=('src/player_attack.mp3',),
+        daemon=True
+    )
+    se_thread.start()
+    
+    player_atk = get_total_atk(player_status)
+    enemy_def = target_enemy["Def"]
+
+    base_damage = (player_atk * 100) // (100 + enemy_def)
+
+    if player_atk <= 0:
+        damage = 0
+    
+    if base_damage <= 0:
+        damage = 0
+    
+    else:
+        variance = random.uniform(0.9, 1.1)
+        damage = round(base_damage * variance)
+    
+    is_protected = False
+    veil_range = SIGHT_RANGE
+
+    for enemy in enemies_list:
+        if enemy.get("ability") == "aurora_veil":
+
+            distance = abs(target_enemy['X'] - enemy['X']) + abs(target_enemy['Y'] - enemy['Y'])
+
+            if distance <= veil_range:
+                is_protected = True
+                break
+    
+    if is_protected:
+        add_log("オーロラベールが攻撃を弱めた!")
+        damage = damage // 2
+
+    enemy_name = target_enemy.get("name", "敵") # .get() で安全に名前取得
+    
+    if damage > 0:
+        target_enemy["HP"] -= damage
+        add_log(f"{enemy_name}に{damage}のダメージを与えた! (残りHP: {target_enemy['HP'] if target_enemy['HP'] > 0 else '0'})")
+        equipped_ring = player_status["Equipment"].get("ring")
+        if equipped_ring and equipped_ring.get("ability") == "drain":
+            drain_hp = damage // 2
+            add_log(f"奇跡のリングによって、体力が {drain_hp} 回復した!")
+            player_status["HP"] = min(player_status["HP"] + drain_hp, player_status["Max_HP"])
+    else:
+        add_log(f"{enemy_name}は攻撃を弾いた！")
+    # --- 修正点：ここまで ---
+    
+    if target_enemy["HP"] <= 0:
+        add_log(f"{enemy_name}を倒した!")
+        enemy_exp = target_enemy.get("Exp", 1)
+        gain_experience(player_status, enemy_exp)
+
+        drop_item_name = None
+        item_data_to_drop = None
+        drop_chance = random.randint(1, 100)
+
+        if enemy_name == "Ain":
+            drop_item_name = "始まりの盾"
+        elif enemy_name == "Zenith":
+            drop_item_name = "終わりの剣"
+        elif enemy_name == "ベールに覆われしオーロラ":
+            if drop_chance <= 30:
+                drop_item_name = "オーロラの指輪"
+        elif enemy_name == "光より速きタキオン":
+            if drop_chance <= 30:
+                drop_item_name == "タキオンリング"
+        
+        if drop_item_name:
+            item_data_to_drop = None
+            for (prob, min_f, max_f, item_data) in ITEM_TABLE:
+                if item_data.get("name") == drop_item_name:
+                    item_data_to_drop = item_data.copy()
+                    break
+        
+        if item_data_to_drop:
+            drop_spot = find_available_drop_spot(enemy_x, enemy_y, dungeon_map, items_list, player_status)
+                
+            if drop_spot:
+                items_list.append(((drop_spot), item_data_to_drop))
+                add_log(f"足元に {drop_item_name} が落ちた！")
+            else:
+                # (周囲8マスがすべて壁やアイテムで埋まっていた場合)
+                add_log(f"{drop_item_name} が落ちたが、置く場所がなかった！")
+
+            
+        enemies_list.remove(target_enemy)
+
+def enemy_turn(dungeon_map, player_status, enemies_list):
+    """
+    プレイヤーのターン終了処理 + 全ての敵の行動処理
+    """
+    
+    # 1. プレイヤーのターン終了処理 (毒、空腹など)
+    handle_status_effects(player_status)
+    consume_hunger(player_status)
+    
+    # 2. 敵の行動処理
+    if not enemies_list:
+        return
+    
+
+    
+    player_x, player_y = player_status["X"], player_status["Y"]
+    
+    # 敵が複数いてもいいようにリストをコピーして処理する
+    for enemy in enemies_list[:]:
+        if enemy not in enemies_list:
+            continue
+            
+        # --- 修正点：ここから ---
+        
+        # 2a. 敵の能力をチェック
+        ability = enemy.get("ability", None)
+
+        num_actions = 2 if ability == "act_twice" else 1
+
+        for _ in range(num_actions):
+
+            
+            if player_status['HP'] <= 0:
+                break # プレイヤーが死んだら、この敵の行動は即終了
+                
+            # (重要) 1回目の行動で敵が（何らかの理由で）死んでいないかチェック
+            if enemy not in enemies_list:
+                break # 敵がリストから消えたら終了
+
+            # 2c. (ここから下は、元の enemy_turn のAIロジックとまったく同じ)
+            enemy_x, enemy_y = enemy["X"], enemy["Y"]
+            distance = abs(player_x - enemy_x) + abs(player_y - enemy_y)
+
+            is_player_near = max(abs(player_x - enemy_x), abs(player_y - enemy_y)) <= 2
+
+            if ability == "heal":
+                heal_amount = enemy.get("Atk", 10)
+                healed_someone = False
+
+                for dy in range(-2, 3):
+                    for dx in range(-2, 3):
+                        check_x, check_y = enemy_x + dx, enemy_y + dy
+                        target_ally = None
+
+                        for e in enemies_list:
+                            if e is not enemy and e.get("HP", 999) < e.get("Max_HP", 0) and (e['X'], e['Y']) == (check_x, check_y):
+                                target_ally = e
+                                break
+                        
+                        if target_ally:
+                            handle_heal_ally(enemy, target_ally, heal_amount)
+                            healed_someone = True
+                            break
+                    
+                    if healed_someone:
+                        continue
+
+            elif ability == "split" and is_player_near and enemy in enemies_list and random.randint(1, 100) <= SPRIT_CHANCE:
+
+                if len(enemies_list) >= MAX_ENEMIES_TOTAL:
+                    add_log("スライムは分裂しようとしたが、敵が多すぎて失敗した!")
+                    continue
+
+                possible_split_coords = []
+                for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    check_x, check_y = enemy["X"] + dx, enemy["Y"] + dy
+
+                    if not (0 <= check_y < FLOOR_HEIGHT and 0 <= check_x < FLOOR_WIDTH) or dungeon_map[check_y][check_x] != MAP_SYMBOLS["FLOOR"]:
+                        continue
+
+                    if (check_x, check_y) == (player_x, player_y):
+                        continue
+
+                    is_occupied = False
+                    for e in enemies_list:
+                        if (e['X'], e['Y']) == (check_x, check_y):
+                            is_occupied = True
+                            break
+                    if is_occupied:
+                        continue
+
+                    possible_split_coords.append((check_x, check_y))
+                
+                if possible_split_coords:
+                    new_x, new_y = random.choice(possible_split_coords)
+
+                    original_hp = enemy['HP']
+
+                    new_hp = max(1, original_hp // 2)
+                    enemy['HP'] = max(1, original_hp - new_hp)
+
+                    new_split = {
+                        "name": enemy["name"],
+                        "symbol": enemy["symbol"],
+                        "HP": new_hp,
+                        "Max_HP": enemy["HP"],
+                        "Atk": enemy["Atk"],
+                        "Def": enemy["Def"],
+                        "Exp": enemy["Exp"],
+                        "X": new_x,
+                        "Y": new_y,
+                        "standing_on": MAP_SYMBOLS["FLOOR"],
+                        "ability": enemy["ability"]
+                    }
+                    enemies_list.append(new_split)
+                    add_log(f"{enemy.get('name', '敵')}は分裂した!")
+                    continue
+            
+
+            elif ability == "gun_shot" or ability == "pro_shot":
+                if check_los(dungeon_map, enemy_x, enemy_y, player_x, player_y, 3):
+                    add_log(f"{enemy.get('name', '敵')}が遠距離攻撃を放った!")
+                    enemy_attack_player(dungeon_map, enemy, player_status)
+                    continue
+            
+            
+            move_x, move_y = 0, 0
+
+            if distance <= SIGHT_RANGE:
+                # 索敵範囲内：プレイヤーを追跡
+                move_x = 1 if player_x > enemy_x else -1 if player_x < enemy_x else 0
+                move_y = 1 if player_y > enemy_y else -1 if player_y < enemy_y else 0
+            else:
+                # 索敵範囲外：ランダムウォーク
+                possible_moves = [(0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
+                move_x, move_y = random.choice(possible_moves)
+
+            # 2d. 移動試行
+            if abs(player_x - enemy_x) >= abs(player_y - enemy_y):
+                # Xを優先
+                new_x, new_y = enemy_x + move_x, enemy_y
+                if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
+                    continue # 1回目の行動成功 -> 2回目の行動へ
+            
+                new_x, new_y = enemy_x, enemy_y + move_y
+                if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
+                    continue # 1回目の行動成功 -> 2回目の行動へ
+            else:
+            # Y方向を優先
+                new_x, new_y = enemy_x, enemy_y + move_y
+                if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
+                    continue # 1回目の行動成功 -> 2回目の行動へ
+
+                new_x, new_y = enemy_x + move_x, enemy_y
+                if try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
+                    continue # 1回目の行動成功 -> 2回目の行動へ
+
+            
+def enemy_attack_player(dungeon_map, enemy, player_status):
+    #敵がプレイヤーを攻撃する関数
+
+    player_def = get_total_def(player_status)
+    enemy_atk = enemy["Atk"]
+
+    base_damage = (enemy_atk * 100) // (100 + player_def)
+
+    if enemy_atk <= 0:
+        damage = 0
+    
+    if base_damage <= 0:
+        damage = 0
+    
+    else:
+        variance = random.uniform(0.9, 1.1)
+        damage = round(base_damage * variance)
+    
+    equipped_ring = player_status["Equipment"].get("ring")
+    if equipped_ring and equipped_ring.get("ability") == "aurora_veil":
+        add_log("オーロラの指輪が、ダメージを半分にした!")
+        damage = damage // 2
+
+    enemy_name = enemy.get("name", "敵")
+    ability = enemy.get("ability", "none")
+    rand_val = random.randint(1, 100) # 確率は1回だけ振る
+
+    if ability == "gun_shot":
+        miss_chance = 30
+        if random.randint(1, 100) <= miss_chance:
+            add_log(f"{enemy_name}の攻撃は外れた!")
+            return # 攻撃失敗 (ダメージ 0)
+            
+    elif ability == "pro_shot":
+        miss_chance = 10
+        if random.randint(1, 100) <= miss_chance:
+            add_log(f"{enemy_name}の攻撃は外れた!")
+            return
+    
+    if damage > 0:
+        player_status["HP"] -= damage
+        add_log(f"{enemy_name}から{damage}のダメージを受けた! 残りHP: {player_status['HP']}")
+
+        
+
+        # (1) 毒 (POISON)
+        if ability == "poison" and rand_val <= 30: # 30%
+            if not is_affected_by(player_status, "POISON"):
+                add_log("毒をうけた！")
+                player_status["status_effects"].append(
+                    {"type": "POISON", "turns": 10}
+                )
+        
+        # (2) 猛毒 (STRONG_POISON)
+        elif ability == "strong_poison" and rand_val <= 20: # 20%
+             if not is_affected_by(player_status, "STRONG_POISON"):
+                add_log("猛毒をうけた！")
+                player_status["status_effects"].append(
+                    {"type": "STRONG_POISON", "turns": 10}
+                )
+
+        elif ability == "confuse" and rand_val <= 20:
+            if not is_affected_by(player_status, "CONFUSED"):
+                add_log("攻撃を受け、頭が混乱した!")
+                player_status["status_effects"].append(
+                    {"type": "CONFUSED", "turns": 5}
+                )
+
+        elif ability == "paralysis" and rand_val <= 30:
+            if not is_affected_by(player_status, "PARALYSIS"):
+                add_log("体が痺れてうまく動けない!")
+                player_status["status_effects"].append(
+                    {"type": "PARALYSIS", "turns": 10}
+                )
+        
+        elif ability == "blind" and rand_val <= 30:
+            if not is_affected_by(player_status, "BLIND"):
+                add_log("攻撃されて、視界が奪われた!")
+                player_status["status_effects"].append(
+                    {"type": "BLIND", "turns": 15}
+                )
+        
+        elif ability == "burn" and rand_val <= 25:
+            potions = [item for item in player_status["inventory"] if item.get("type") == "potion"]
+
+            if potions:
+                item_to_burn = random.choice(potions)
+                player_status["inventory"].remove(item_to_burn)
+                add_log(f"{item_to_burn['name']}は燃えて灰になった!")
+        
+        elif ability == "rotten" and rand_val <= 25:
+
+            foods = [item for item in player_status["inventory"] if item.get("type") == "food"]
+
+            if foods:
+                item_to_rot = random.choice(foods)
+                player_status["inventory"].remove(item_to_rot)
+                add_log(f"{item_to_rot['name']}は腐ってしまった!")
+        
+        elif ability == "pusher" and rand_val <= 40:
+            dx = player_status["X"] - enemy["X"]
+            dy = player_status["Y"] - enemy["Y"]
+
+            target_x = player_status["X"] + dx
+            target_y = player_status["Y"] + dy
+
+            if is_valid_move(dungeon_map, target_x, target_y):
+                add_log(f"{enemy_name}に吹き飛ばされた!")
+                player_status["X"] = target_x
+                player_status["Y"] = target_y
+            
+            else:
+                add_log("壁に叩きつけられた!")
+                player_status["HP"] -= 10
+        
+        elif ability == "reverse":
+            add_log(f"{enemy_name}の攻撃で、体の調子が入れ替わる!")
+
+            current_hp = player_status["HP"]
+            current_hung = player_status["Hung"]
+
+            player_status["HP"] = min(player_status["Max_HP"], current_hung)
+            player_status["Hung"] = max(0, current_hp)
+
+            add_log(f"HP({current_hp})と満腹度({current_hung})が入れ替わった!")
+
+            current_atk = player_status["Atk"]
+            current_def = player_status["Def"]
+            player_status["Atk"] = current_def
+            player_status["Def"] = current_atk
+
+            add_log(f"攻撃力({current_atk})と防御力{current_def}が入れ替わった!")
+
+            if player_status["HP"] <= 0:
+                add_log("この反転した世界で生き残ることはできなかった...")
+
+
+    else:
+        add_log(f"{enemy_name}の攻撃をかわした!")
+
+def try_enemy_move_or_attack(dungeon_map, enemy, player_status, enemies_list, new_x, new_y):
+    """
+    敵が (new_x, new_y) へ移動または攻撃を試みる関数
+    """
+
+    # 0. 移動先が現在地と同じなら失敗
+    if new_x == enemy["X"] and new_y == enemy["Y"]:
+        return False
+    
+    # --- 修正点：ここから ---
+
+    # 1. 移動先はプレイヤーか？ (player_status を直接チェック)
+    if new_x == player_status["X"] and new_y == player_status["Y"]:
+        enemy_attack_player(dungeon_map, enemy, player_status)
+        return True # 攻撃成功
+
+    # 2. 移動先は「壁」か？ (dungeon_map をチェック)
+    if not (0 <= new_y < FLOOR_HEIGHT and 0 <= new_x < FLOOR_WIDTH) or \
+       dungeon_map[new_y][new_x] == MAP_SYMBOLS["WALL"]:
+        return False # 壁には移動しない
+        
+    # 3. 移動先は「他の敵」か？ (enemies_list をチェック)
+    for other_enemy in enemies_list: # (game_data.enemies_list を参照)
+        if other_enemy is not enemy and \
+           other_enemy["X"] == new_x and other_enemy["Y"] == new_y:
+            return False # 他の敵の上には移動しない
+    
+    # --- 修正点：ここまで ---
+    # 4. 移動実行
+    # (移動先は 床, アイテム, 階段 のいずれか)
+    # 新しい場所のタイル(床, アイテム, 階段)を 'standing_on' に保存
+    enemy["standing_on"] = dungeon_map[new_y][new_x]
+    
+    # 座標を更新
+    enemy["X"], enemy["Y"] = new_x, new_y
+    
+    return True
+
+def get_menu_input(stdscr):
+    # curses でメニュー用の入力を受け付ける
+    stdscr.addstr(26, 0, "使用/装備アイテム番号(0...)、捨てる(d)、または 終了(x) を入力")
+    
+    key_code = stdscr.getch()
+    move = ' ' # デフォルト値
+    
+    try:
+        move = chr(key_code)
+    except Exception:
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
+        
+    # --- 修正点：return を try/except の「外」に出す ---
+    return move.lower()
+
+def handle_menu_input(dungeon_map, status, enemies_list, items_list, action):
+    #メニュー入力に応じた処理を呼び出す関数
+    
+    if action == "x":
+        # xならメニューを閉じる
+        data.game_state = "playing"
+        add_log("メニューを閉じた")
+        return True # ゲームは続行
+    
+    elif action == "d":
+        # dが押されたら、捨てるモードに移行
+        data.game_state = "drop_menu"
+        add_log("何を捨てますか？")
+    
+    elif action.isdigit():
+        #数字が入力されたら、アイテム使用/装備を試みる
+        item_index = int(action)
+        inventory = status["inventory"]
+
+        # 1. 有効なインデックスかチェック
+        if not (0 <= item_index < len(inventory)):
+            add_log("その番号のアイテムは持っていない。")
+            return True # ゲームは続行 (ターン消費なし)
+        
+        # 2. アイテムの種類によって処理を分岐
+        item = inventory[item_index]
+        item_type = item.get("type", "unknown")
+        
+        turn_consumed = False # ターンが消費されたか
+
+        if item_type in ["potion", "food"]:
+            # 消費アイテムの場合
+            turn_consumed = use_item(status, item_index)
+        
+        elif item_type in ["weapon", "shield", "ring"]:
+            # 装備アイテムの場合
+            turn_consumed = equip_item(status, item_index)
+            
+        else:
+            # どちらでもない場合
+            add_log(f"{item.get('name')} は使ったり装備したりできない。")
+
+        # 3. ターン消費の処理
+        if turn_consumed:
+            # アイテム使用/装備に成功したら、メニューを閉じて敵のターンへ
+            data.game_state = "playing"
+            # 敵のターンを呼び出す
+            enemy_turn(dungeon_map, status, data.enemies_list)
+        else:
+            # アイテム使用失敗(満タンなど)または装備失敗
+            # (ログは各関数内で出ているはず)
+            pass
+        return True
+            
+    elif action == "q":
+        return False # ゲーム終了
+    
+    return True # ゲーム続行
+
+def get_drop_input(stdscr):
+    # curses で捨てるアイテム用の入力を受け付ける
+    stdscr.addstr(26, 0, "捨てるアイテムの番号(0, 1...) または 終了(x) を入力   ")
+    
+    key_code = stdscr.getch()
+    move = ' ' # デフォルト値
+    
+    try:
+        move = chr(key_code)
+    except Exception:
+        pass # 特殊キーは ' ' (デフォルト値) のままにする
+        
+    # --- 修正点：return を try/except の「外」に出す ---
+    return move.lower()
+
+def drop_item(dungeon_map, player_status, items_list, item_index):
+    """
+    指定されたインデックスのアイテムを足元に置く関数
+    
+    - 足元にアイテムが「ない」場合は、そのまま置く (ドロップ)
+    - 足元にアイテムが「ある」場合は、足元のアイテムを拾ってから置く (スワップ)
+    """
+    
+    inventory = player_status["inventory"]
+    
+    # 1. 有効なインデックスかチェック
+    if not (0 <= item_index < len(inventory)):
+        add_log("その番号のアイテムは持っていない。")
+        return False
+
+    player_x, player_y = player_status["X"], player_status["Y"]
+    
+    # 2. 足元にあるアイテムを探す (スワップ用)
+    item_on_floor_data = None
+    item_on_floor_to_remove = None # items_list から削除するための実体
+    
+    for item in items_list:
+        coords, data = item
+        if coords == (player_x, player_y):
+            item_on_floor_data = data
+            item_on_floor_to_remove = item
+            break # アイテムを1つ見つけたら終了
+            
+    # 3. 捨てるアイテムを取得 (インベントリから先に削除)
+    item_to_drop = inventory.pop(item_index)
+
+    # 4. 足元にアイテムがあったか？ (スワップ処理)
+    if item_on_floor_data:
+        se_thread = threading.Thread(
+                target=play_sound_effect,
+                args=('src/Itemget.mp3',),
+                daemon=True
+            )
+        se_thread.start()
+        
+        # 4a. 足元のアイテムを items_list から削除
+        items_list.remove(item_on_floor_to_remove)
+        
+        # 4b. 足元のアイテムをインベントリに追加
+        # (注：10個の時に1個捨て(pop)てから1個拾うので、数は10個のまま。
+        inventory.append(item_on_floor_data)
+        
+        # 4c. 捨てたアイテムを items_list に追加 (足元に置く)
+        items_list.append(((player_x, player_y), item_to_drop))
+        
+        # 4d. マップの見た目は '!' のまま (変わらない)
+        
+        add_log(f"{item_on_floor_data['name']} を拾い、{item_to_drop['name']} を足元に置いた。")
+
+    else:
+        # 5. 足元に何もなかった場合 (通常のドロップ)
+        
+        # 5a. 捨てたアイテムを items_list に追加 (足元に置く)
+        items_list.append(((player_x, player_y), item_to_drop))
+        
+        add_log(f"{item_to_drop['name']} を足元に捨てた。")
+
+    return True # ターン消費
+
+def handle_drop_input(dungeon_map, status, enemies_list, items_list, action):
+    #捨てる入力に応じた処理を呼び出す関数
+    if action == "x":
+        # xならメニューを閉じる
+        data.game_state = "playing"
+        #add_log("捨てるのをやめた")
+        return True
+    
+    elif action.isdigit():
+        #数字が入力されたらアイテムを捨てる
+        item_index = int(action)
+
+        turn_consumed = drop_item(dungeon_map, status, items_list, item_index)
+
+        if turn_consumed:
+            data.game_state = "playing"
+            enemy_turn(dungeon_map, status, data.enemies_list)
+        else:
+            pass
+        
+        return True
+    
+    elif action == "q":
+        return False
+    
+    return True
+
+def get_quit_confirm_input(stdscr):
+    """終了確認用の入力を受け付ける"""
+    # y=25 (プロンプト行) に描画
+    stdscr.addstr(26, 0, "本当に終了しますか？ [y]はい / [n]いいえ      ") 
+    
+    key_code = stdscr.getch()
+    move = ' ' 
+    try:
+        move = chr(key_code)
+    except Exception:
+        pass 
+    return move.lower()
+
+def handle_quit_confirm_input(action):
+    """終了確認の入力処理"""
+    
+    if action == 'y':
+        # Yes -> 終了
+        return False # is_running = False
+        
+    elif action == 'x' or action == 'n':
+        # No/Cancel -> ゲーム再開
+        add_log("ゲームを続けます。")
+        data.game_state = "playing"
+        return True # is_running = True
+        
+    else:
+        # y/x/n 以外が押された
+        # (何もしない。プロンプトが再描画される)
+        return True # is_running = True
+    
+
+def use_item(player_status, item_index):
+    #指定されたインデックスのアイテムを使用する関数
+
+    inventory = player_status["inventory"]
+
+    # 有効なインデックスかチェック
+    if not (0 <= item_index < len(inventory)):
+        add_log("無は使えないよ")
+        return
+    
+    item_to_use = inventory[item_index]
+    item_type = item_to_use.get("type", "unknown")
+
+    if item_type == "potion":
+
+        if player_status["HP"] >= player_status["Max_HP"]:
+            add_log("もうHPは満タンだ。")
+            return False
+
+        # HP回復
+        heal_amount = item_to_use["effect"]
+        player_status["HP"] += heal_amount
+
+        # Max_HPを超えないようにする
+        if player_status["HP"] > player_status["Max_HP"]:
+            player_status["HP"] = player_status["Max_HP"]
+        
+        add_log(f"{item_to_use['name']} を使った! HPが {heal_amount} 回復した!")
+
+        inventory.pop(item_index)
+        return True
+
+    elif item_type == "food":
+
+        recover_amount = item_to_use["effect"]
+
+        if player_status["Hung"] >= player_status["Max_Hung"]:
+            add_log("お腹は空いてない。")
+            return False
+        
+        player_status["Hung"] = min(player_status["Max_Hung"], player_status["Hung"] + recover_amount)
+        add_log(f"{item_to_use['name']} を食べた! 空腹度が {recover_amount} 回復した!")
+
+        inventory.pop(item_index)
+        return True
+    
+    elif item_type in ["weapon", "shield"]:
+        add_log(f"{item_to_use['name']} は装備するものだ。")
+        return False
+
+    else:
+        add_log(f"{item_to_use['name']} は今使えない。")
+        return False
+
+def equip_item(player_status, item_index):
+    # 指定されたインデックスのアイテムを装備する関数
+    inventory = player_status["inventory"]
+
+    # アイテムが存在するか確認
+    if not (0 <= item_index < len(inventory)):
+        add_log("エラー: 無は装備できないよ")
+        return False
+    
+    item_to_equip = inventory[item_index]
+    item_type = item_to_equip.get("type")
+
+    # 装備スロットを決定
+
+    equip_slot = None
+    if item_type == "weapon":
+        equip_slot = "weapon"
+    elif item_type == "shield":
+        equip_slot = "shield"
+    elif item_type == "ring":
+        equip_slot = "ring"
+
+    else:
+       add_log(f"{item_to_equip.get('name')} は装備できない。")
+       return False
+    
+    se_thread = threading.Thread(
+        target=play_sound_effect,
+        args=('src/equip.mp3',),
+        daemon=True
+    )
+    se_thread.start()
+    
+    # 装備の交換処理
+    current_equipment = player_status["Equipment"].get(equip_slot)
+
+    player_status["Equipment"][equip_slot] = item_to_equip
+
+    inventory.pop(item_index)
+
+    # 古い装備をインベントリに戻す
+    if current_equipment:
+        inventory.append(current_equipment)
+        add_log(f"{current_equipment.get('name')} を外し、 {item_to_equip.get('name')} を装備した!")
+    else:
+        add_log(f"{item_to_equip.get('name')} を装備した!")
+    
+    return True
+    
+def get_total_atk(player_status):
+    # 素のAtkと装備品のAtkボーナスを合計した値を返す
+    base_atk = player_status["Atk"]
+    weapon = player_status["Equipment"].get("weapon")
+
+    if weapon:
+        # 武器を装備していれば、ボーナスを加算
+        base_atk += weapon.get("atk_bonus", 0)
+
+    return base_atk
+
+def get_total_def(player_status):
+    # 素のDefと装備品のDefボーナスを合計した値を返す
+    base_def = player_status["Def"]
+    shield = player_status["Equipment"].get("shield")
+
+    if shield:
+        # 盾を装備していれば、ボーナスを加算
+        base_def += shield.get("def_bonus", 0)
+    
+    return base_def
+
+def gain_experience(player_status, exp_amount):
+    
+    player_status["Exp"] += exp_amount
+    add_log(f"{exp_amount} の経験値を獲得した。(現在: {player_status['Exp']}/{player_status['Next_Exp']})")
+    while player_status["Exp"] >= player_status["Next_Exp"]:
+        level_up(player_status)
+
+def level_up(player_status):
+    Max_level = 15
+
+    if player_status["Lv"] != Max_level:
+        se_thread = threading.Thread(
+            target=play_sound_effect,
+            args=('src/level.wav',),
+            daemon=True
+        )
+        se_thread.start()
+
+    next_level = player_status["Lv"] + 1
+    level_data = LEVEL_UP_TABLE.get(next_level)
+
+    if not level_data:
+        player_status["Next_HP"] = 100000000
+        add_log("君は最大レベルまで達したようだ。")
+        player_status["Exp"] = player_status["Next_Exp"] - 1
+        return
+    
+    player_status["Lv"] += 1
+    player_status["Max_HP"] += level_data["Max_HP_Up"]
+    player_status["Atk"] += level_data["Atk_Up"]
+    player_status["Def"] += level_data["Def_Up"]
+
+    player_status["HP"] = player_status["Max_HP"]
+    # player_status["Hung"] = player_status["Max_Hung"]
+
+    player_status["Exp"] -= player_status["Next_Exp"]
+    player_status["Next_Exp"] = level_data["Next_Exp"]
+
+    add_log(f"レベルが {player_status['Lv']} に上がった!")
+    add_log(f"最大HPが {level_data['Max_HP_Up']}、攻撃力が {level_data['Atk_Up']}、防御力が {level_data['Def_Up']} 上がった!")
+
+def handle_heal_ally(healer_enemy, target_enemy, heal_amount):
+    #healerが敵を回復させる処理
+
+    max_hp = target_enemy.get('Max_HP', target_enemy['HP'])
+
+    if target_enemy['HP'] >= max_hp:
+        return False
+    
+    target_enemy['HP'] = min(max_hp, target_enemy['HP'] + heal_amount)
+
+    #スレッドでSEを鳴らす
+
+    add_log(f"{healer_enemy.get('name')}は{target_enemy.get('name')}を {heal_amount} 回復させた!")
+    return True
+
+
+def is_affected_by(player_status, effect_type):
+    """プレイヤーが特定の状態異常にかかっているかチェックする"""
+    for effect in player_status.get("status_effects", []):
+        if effect.get("type") == effect_type:
+            return True
+    return False
+
+def handle_status_effects(player_status):
+    """
+    毎ターン、プレイヤーにかかっている状態異常を処理する
+    (ダメージ、回復、ターン経過など)
+    """
+    # (リストを逆順(reversed)でループするのがコツじゃ。
+    #  途中で .remove() してもループが壊れない)
+    for effect in reversed(player_status.get("status_effects", [])):
+        
+        effect_type = effect.get("type")
+        
+        # --- (1) 効果の適用 ---
+        if effect_type == "POISON":
+            add_log("毒により 1 のダメージを受けた。")
+            player_status["HP"] -= 1
+        
+        elif effect_type == "STRONG_POISON":
+             add_log("猛毒により 3 のダメージを受けた。")
+             player_status["HP"] -= 3
+
+        # (ここに "CONFUSED" などの処理も追加していく)
+
+        # --- (2) ターンの経過 ---
+        effect["turns"] -= 1
+        
+        # --- (3) 効果の終了 ---
+        if effect["turns"] <= 0:
+            add_log(f"[{effect_type}] の効果が切れた。")
+            player_status["status_effects"].remove(effect)
+
