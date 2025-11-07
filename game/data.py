@@ -104,7 +104,7 @@ ENEMY_TABLE = [
     (50, 1, 14, {
         "name": "ゴブリン", "symbol": "G", "min_floor": 1,
         "base_HP": 10, "base_Atk": 5, "base_Def": 2, "base_Exp": 5,
-        "ability": "rotten"
+        "ability": "none"
     }),
     (50, 5, 29, {
         "name": "スライム", "symbol": "S", "min_floor": 5,
