@@ -3,11 +3,8 @@ import random
 import game.data as data
 from game.data import MAP_SYMBOLS, game_log, LEVEL_UP_TABLE, ITEM_TABLE, ENEMY_TABLE, ITEM_TABLE
 import threading
+import pygame
 
-try:
-    from playsound import playsound
-except ImportError:
-    playsound = None
 
 def add_log(message):
     #ゲームログに新しいメッセージを追加する関数
@@ -16,14 +13,15 @@ def add_log(message):
         game_log.pop
 
 def play_sound_effect(sound_file):
-    """SE再生を「別スレッド」で実行する関数"""
-    if not playsound:
+    """SE再生を実行する関数（Pygameの仕様で自動的に非同期再生されます）"""
+    if not pygame.mixer.get_init():
         return
     try:
-        playsound(sound_file)
-    except Exception as e:
-        # (SE再生失敗は、ログにも出さず、握りつぶすのが吉)
+        se = pygame.mixer.Sound(sound_file)
+        se.play()
+    except Exception:
         pass
+    
 
 def get_movement_input(stdscr):
     # curses でプレイヤーの入力を受け付ける

@@ -10,11 +10,6 @@ from game.logic import (get_movement_input, handle_input, generate_dungeon, add_
 import pygame
 import threading
 
-try:
-    from playsound import playsound
-except ImportError:
-    playsound = None
-
 def game_loop(stdscr, dungeon_map, enemies_list, items_list):
     global player_status
     
