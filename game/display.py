@@ -117,7 +117,7 @@ def draw_tutorial_screen(stdscr):
     stdscr.addstr(15, 7, "@           : あなた")
     stdscr.addstr(16, 7, "A ~ Z       : 敵")
     stdscr.addstr(17, 7, "!           : アイテム")
-    stdscr.addstr(18, 7, "<           : 階段")
+    stdscr.addstr(18, 7, "<           : 階段(その階層のゴール)")
 
 
     stdscr.addstr(20, 7, "--- メニュー画面中(キー操作) ---")

@@ -1269,11 +1269,11 @@ def get_quit_confirm_input(stdscr):
     stdscr.addstr(26, 0, "本当に終了しますか？ [y]はい / [n]いいえ      ") 
     
     key_code = stdscr.getch()
-    move = ' ' 
+    move = ' '
     try:
         move = chr(key_code)
     except Exception:
-        pass 
+        pass
     return move.lower()
 
 def handle_quit_confirm_input(action):
